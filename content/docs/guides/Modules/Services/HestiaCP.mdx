@@ -1,0 +1,65 @@
+---
+title: HestiaCP Setup
+description: Follow this docs to setup HestiaCP!
+---
+
+# HestiaCP Setup
+
+Follow this documentation to setup HestiaCP with DezerX!
+
+## Step 1: Configure HestiaCP API Access
+
+1. **Log into your HestiaCP admin panel** using your administrator credentials
+
+2. **Navigate to Server Settings**:
+   - Go to `Server` → `Settings` in the HestiaCP admin panel
+   - Look for the API settings section
+
+3. **Enable API Access**:
+   - Enable the API functionality if it's not already enabled
+   - Note down the HestiaCP URL (usually `https://your-hestia-domain.com
+
+
+## Step 2: Whitelist DezerX (Spartan) IP Address
+
+To allow DezerX to connect to your HestiaCP instance, you need to whitelist the DezerX Spartan's server's IP address:
+
+1. **Find your DezerX Spartan's server's IP address**:
+   - Check your server's public IP address
+   - This is the IP address that DezerX will use to make API calls to HestiaCP
+
+2. **Add IP to HestiaCP whitelist**:
+   - In HestiaCP admin panel, go to `Server` → `Configuration` 
+   - Add your DezerX server's IP address to the allowed list
+   - Ensure the IP is whitelisted for API access
+
+## Step 3: Configure DezerX Admin Panel
+
+1. **Navigate to Admin Panel**: Go to `Admin → Modules → HestiaCP `
+
+![HestiaCP Configuration Panel](/hestiacp/step-1.png)
+
+2. **Enter HestiaCP Details**:
+   - **HestiaCP URL**: Enter your HestiaCP panel URL (e.g., `https://your-hestia-domain.com`)
+   - **Admin Username**: Enter your HestiaCP administrator username
+   - **Admin Password**: Enter your HestiaCP administrator password
+   - Click the **"Test Connection"** button to verify the setup
+
+## Step 4: Test the Connection
+
+Once you've configured all the required details:
+
+1. Click the **"Test Connection"** button in the DezerX admin panel
+2. If successful, you'll see a confirmation message
+3. If there are any errors, double-check your credentials and URL
+
+## Troubleshooting
+
+If you encounter any issues:
+
+- Verify that your HestiaCP URL is correct and accessible
+- Ensure your admin credentials have sufficient permissions
+- Check that your DezerX server's IP address is whitelisted in HestiaCP
+- Verify that API access is enabled in HestiaCP settings
+- Make sure there are no firewall rules blocking the connection
+- Check HestiaCP logs for any API-related errors

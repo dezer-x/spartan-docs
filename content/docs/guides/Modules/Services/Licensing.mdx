@@ -1,0 +1,486 @@
+---
+title: License Module Setup
+description: Follow this docs to Interegrate licensing in ur product using our License Service!
+---
+
+# License Service API - Usage Guide with cURL Commands
+
+## Overview
+
+The License Service API provides secure endpoints for license verification and file downloads. This guide covers all available endpoints with practical cURL examples.
+
+**Base URL**: `/api/license`
+
+## Authentication Requirements
+
+All protected endpoints require:
+1. **Bearer Token**: Your license key in the Authorization header
+2. **Domain Validation**: Domain must be provided and match your license configuration
+3. **Product ID Validation**: Product ID must be provided and match your license's product
+
+### Authentication Headers
+
+```bash
+Authorization: Bearer YOUR_LICENSE_KEY
+X-Domain: your-domain.com
+X-Product-ID: YOUR_PRODUCT_ID
+```
+
+**OR** include domain and product_id in request body:
+```json
+{
+  "domain": "your-domain.com",
+  "product_id": 123
+}
+```
+
+## Endpoint 1: Verify License
+
+**Purpose**: Verify your license key and get license information  
+**Method**: `GET`  
+**Authentication**: Required  
+**Rate Limited**: Yes (60 requests/minute)
+
+### cURL Command
+
+```bash
+curl -X GET "https://your-domain.com/api/license/verify" \
+  -H "Authorization: Bearer YOUR_LICENSE_KEY" \
+  -H "X-Domain: your-domain.com" \
+  -H "X-Product-ID: YOUR_PRODUCT_ID" \
+  -H "Content-Type: application/json"
+```
+
+### Alternative with Domain and Product ID in Body
+
+```bash
+curl -X GET "https://your-domain.com/api/license/verify" \
+  -H "Authorization: Bearer YOUR_LICENSE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"domain": "your-domain.com", "product_id": 123}'
+```
+
+### Example Response
+
+```json
+{
+    "success": true,
+    "message": "License is valid and active",
+    "data": {
+        "license_id": 13,
+        "license_key": "DEZERX_YK5YCNP0S9IONLT6",
+        "product_id": 1,
+        "product_name": "Your Product Name",
+        "user_id": 123,
+        "is_active": true,
+        "last_rotated": "2024-01-15T10:30:00.000000Z",
+        "created_at": "2025-08-02T10:37:44.598732Z",
+        "domain": "your-domain.com"
+    }
+}
+```
+
+### Common Error Responses
+
+**401 Unauthorized** - Invalid license key:
+```json
+{
+    "success": false,
+    "message": "Invalid license key",
+    "error_code": "INVALID_LICENSE"
+}
+```
+
+**400 Bad Request** - Missing domain or product_id:
+```json
+{
+    "success": false,
+    "message": "Domain is required",
+    "error_code": "MISSING_DOMAIN"
+}
+```
+
+```json
+{
+    "success": false,
+    "message": "Product ID is required",
+    "error_code": "MISSING_PRODUCT_ID"
+}
+```
+
+**403 Forbidden** - Domain mismatch or product ID mismatch:
+```json
+{
+    "success": false,
+    "message": "Domain mismatch. License not valid for this domain.",
+    "error_code": "DOMAIN_MISMATCH"
+}
+```
+
+```json
+{
+    "success": false,
+    "message": "Product ID mismatch. License not valid for this product.",
+    "error_code": "PRODUCT_ID_MISMATCH"
+}
+```
+
+---
+
+## Endpoint 2: Generate Download Token
+
+**Purpose**: Create a one-time download token for accessing product files  
+**Method**: `POST`  
+**Authentication**: Required  
+**Rate Limited**: Yes (60 requests/minute)
+
+### cURL Command
+
+```bash
+curl -X POST "https://your-domain.com/api/license/download" \
+  -H "Authorization: Bearer YOUR_LICENSE_KEY" \
+  -H "X-Domain: your-domain.com" \
+  -H "X-Product-ID: YOUR_PRODUCT_ID" \
+  -H "Content-Type: application/json"
+```
+
+### Alternative with Domain and Product ID in Body
+
+```bash
+curl -X POST "https://your-domain.com/api/license/download" \
+  -H "Authorization: Bearer YOUR_LICENSE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"domain": "your-domain.com", "product_id": 123}'
+```
+
+### Example Response
+
+```json
+{
+    "success": true,
+    "message": "Download token generated successfully",
+    "data": {
+        "download_url": "https://your-domain.com/api/license/download-file/abc123def456...",
+        "expires_at": "2024-01-16T10:30:00.000Z",
+        "product_name": "Your Product Name",
+        "file_size": 1048576
+    }
+}
+```
+
+### Common Error Responses
+
+**403 Forbidden** - API download disabled:
+```json
+{
+    "success": false,
+    "message": "API download is disabled for this product"
+}
+```
+
+**404 Not Found** - No downloadable file:
+```json
+{
+    "success": false,
+    "message": "No downloadable file available for this product"
+}
+```
+
+---
+
+## Endpoint 3: Download File
+
+**Purpose**: Download a file using a one-time token  
+**Method**: `GET`  
+**Authentication**: None (uses token)  
+**Rate Limited**: No
+
+### cURL Command
+
+```bash
+curl -X GET "https://your-domain.com/api/license/download-file/YOUR_TOKEN_HERE" \
+  -O -J
+```
+
+**Flags Explained**:
+- `-O`: Save file with original filename
+- `-J`: Use filename from Content-Disposition header
+
+### Alternative with Custom Filename
+
+```bash
+curl -X GET "https://your-domain.com/api/license/download-file/YOUR_TOKEN_HERE" \
+  -o "my-product.zip"
+```
+
+### Example Response
+
+**Success**: File download with headers:
+```
+HTTP/1.1 200 OK
+Content-Type: application/zip
+Content-Disposition: attachment; filename="product.zip"
+Content-Length: 1048576
+
+[Binary file data]
+```
+
+**Error Response**:
+```json
+{
+    "success": false,
+    "message": "Invalid or expired download token"
+}
+```
+
+---
+
+## Complete Workflow Example
+
+Here's a complete example of the entire download process:
+
+### Step 1: Verify License
+
+```bash
+curl -X GET "https://your-domain.com/api/license/verify" \
+  -H "Authorization: Bearer DEZERX_YK5YCNP0S9IONLT6" \
+  -H "X-Domain: your-domain.com" \
+  -H "X-Product-ID: 1" \
+  -H "Content-Type: application/json"
+```
+
+### Step 2: Generate Download Token
+
+```bash
+curl -X POST "https://your-domain.com/api/license/download" \
+  -H "Authorization: Bearer DEZERX_YK5YCNP0S9IONLT6" \
+  -H "X-Domain: your-domain.com" \
+  -H "X-Product-ID: 1" \
+  -H "Content-Type: application/json"
+```
+
+### Step 3: Download File
+
+```bash
+curl -X GET "https://your-domain.com/api/license/download-file/abc123def456..." \
+  -O -J
+```
+
+---
+
+## Advanced cURL Options
+
+### Verbose Output (Debug Mode)
+
+```bash
+curl -v -X GET "https://your-domain.com/api/license/verify" \
+  -H "Authorization: Bearer YOUR_LICENSE_KEY" \
+  -H "X-Domain: your-domain.com" \
+  -H "X-Product-ID: YOUR_PRODUCT_ID"
+```
+
+### Save Response Headers
+
+```bash
+curl -D headers.txt -X GET "https://your-domain.com/api/license/verify" \
+  -H "Authorization: Bearer YOUR_LICENSE_KEY" \
+  -H "X-Domain: your-domain.com" \
+  -H "X-Product-ID: YOUR_PRODUCT_ID"
+```
+
+### Follow Redirects
+
+```bash
+curl -L -X GET "https://your-domain.com/api/license/download-file/YOUR_TOKEN" \
+  -O -J
+```
+
+### Custom User Agent
+
+```bash
+curl -X GET "https://your-domain.com/api/license/verify" \
+  -H "Authorization: Bearer YOUR_LICENSE_KEY" \
+  -H "X-Domain: your-domain.com" \
+  -H "X-Product-ID: YOUR_PRODUCT_ID" \
+  -H "User-Agent: MyApp/1.0"
+```
+
+---
+
+## Error Handling Examples
+
+### Check HTTP Status Code
+
+```bash
+curl -w "HTTP Status: %{http_code}\n" \
+  -X GET "https://your-domain.com/api/license/verify" \
+  -H "Authorization: Bearer YOUR_LICENSE_KEY" \
+  -H "X-Domain: your-domain.com" \
+  -H "X-Product-ID: YOUR_PRODUCT_ID"
+```
+
+### Handle Errors in Scripts
+
+```bash
+#!/bin/bash
+
+# Verify license
+response=$(curl -s -w "%{http_code}" \
+  -X GET "https://your-domain.com/api/license/verify" \
+  -H "Authorization: Bearer YOUR_LICENSE_KEY" \
+  -H "X-Domain: your-domain.com" \
+  -H "X-Product-ID: YOUR_PRODUCT_ID")
+
+http_code="${response: -3}"
+body="${response%???}"
+
+if [ "$http_code" = "200" ]; then
+    echo "License verified successfully"
+    echo "$body" | jq '.data.license_key'
+else
+    echo "Error: HTTP $http_code"
+    echo "$body" | jq '.message'
+fi
+```
+
+---
+
+## Rate Limiting
+
+- **Default Limit**: 60 requests per minute per IP
+- **Response**: HTTP 429 when exceeded
+- **Headers**: Rate limit information included in responses
+
+### Check Rate Limit Status
+
+```bash
+curl -I -X GET "https://your-domain.com/api/license/verify" \
+  -H "Authorization: Bearer YOUR_LICENSE_KEY" \
+  -H "X-Domain: your-domain.com" \
+  -H "X-Product-ID: YOUR_PRODUCT_ID"
+```
+
+---
+
+## Security Features
+
+1. **One-Time Tokens**: Download tokens expire after 24 hours and can only be used once
+2. **Domain Validation**: All requests must include and validate the domain
+3. **Product ID Validation**: All requests must include and validate the product ID
+4. **Bearer Authentication**: Secure token-based authentication
+5. **Rate Limiting**: Prevents abuse and ensures fair usage
+6. **No-Cache Headers**: Prevents browser caching of sensitive responses
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"Authorization header missing"**
+   - Ensure `Authorization: Bearer YOUR_KEY` header is present
+
+2. **"Domain is required"**
+   - Include `X-Domain` header or domain in request body
+
+3. **"Product ID is required"**
+   - Include `X-Product-ID` header or product_id in request body
+
+4. **"License is inactive"**
+   - Check if license is active in admin panel
+
+5. **"Product ID mismatch"**
+   - Ensure the product_id matches your license's product
+
+6. **"Too many requests"**
+   - Wait for rate limit window to reset (1 minute)
+
+7. **"Invalid or expired download token"**
+   - Generate a new download token
+   - Tokens expire after 24 hours
+
+### Debug Commands
+
+```bash
+# Test with verbose output
+curl -v -X GET "https://your-domain.com/api/license/verify" \
+  -H "Authorization: Bearer YOUR_LICENSE_KEY" \
+  -H "X-Domain: your-domain.com" \
+  -H "X-Product-ID: YOUR_PRODUCT_ID"
+
+# Check response headers
+curl -I -X GET "https://your-domain.com/api/license/verify" \
+  -H "Authorization: Bearer YOUR_LICENSE_KEY" \
+  -H "X-Domain: your-domain.com" \
+  -H "X-Product-ID: YOUR_PRODUCT_ID"
+```
+
+---
+
+## Environment Variables Setup
+
+For production use, set up environment variables:
+
+```bash
+export LICENSE_KEY="DEZERX_YK5YCNP0S9IONLT6"
+export DOMAIN="your-domain.com"
+export PRODUCT_ID="123"
+export API_BASE="https://your-domain.com/api/license"
+
+# Then use in commands:
+curl -X GET "$API_BASE/verify" \
+  -H "Authorization: Bearer $LICENSE_KEY" \
+  -H "X-Domain: $DOMAIN" \
+  -H "X-Product-ID: $PRODUCT_ID"
+```
+
+---
+
+## Testing with Different Tools
+
+### Using wget
+
+```bash
+wget --header="Authorization: Bearer YOUR_LICENSE_KEY" \
+     --header="X-Domain: your-domain.com" \
+     --header="X-Product-ID: YOUR_PRODUCT_ID" \
+     "https://your-domain.com/api/license/verify"
+```
+
+### Using httpie
+
+```bash
+http GET "https://your-domain.com/api/license/verify" \
+  Authorization:"Bearer YOUR_LICENSE_KEY" \
+  X-Domain:your-domain.com \
+  X-Product-ID:YOUR_PRODUCT_ID
+```
+
+### Using Postman/Insomnia
+
+Set headers:
+- `Authorization: Bearer YOUR_LICENSE_KEY`
+- `X-Domain: your-domain.com`
+- `X-Product-ID: YOUR_PRODUCT_ID`
+- `Content-Type: application/json`
+
+---
+
+## Best Practices
+
+1. **Always handle errors**: Check HTTP status codes and error messages
+2. **Use environment variables**: Don't hardcode sensitive information
+3. **Implement retry logic**: Handle temporary failures gracefully
+4. **Monitor rate limits**: Respect API limits and implement backoff
+5. **Secure storage**: Store license keys securely, not in plain text files
+6. **Logging**: Log API interactions for debugging and monitoring
+7. **Validate all required fields**: Ensure domain, product_id, and license key are provided
+
+---
+
+## Support
+
+For additional support or questions about the License Service API:
+- Check the admin panel for license status
+- Review server logs for detailed error information
+- Contact system administrator for license-related issues 
