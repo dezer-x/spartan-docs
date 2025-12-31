@@ -1,0 +1,64 @@
+---
+title: Namecheap Setup
+description: Step-by-step guide to integrate Namecheap with DezerX Spartan.
+---
+
+## Overview
+
+This guide explains how to connect your Namecheap account to **DezerX Spartan** using the Namecheap API.
+
+>
+> * You must have **$50+ in Namecheap account credit**, **or**
+> * At least **20 active domains** in your Namecheap account
+>
+> Without meeting one of these requirements, the Namecheap API cannot be enabled.
+
+---
+
+## Step 1: Access Namecheap API Settings
+
+1. Log in to your **Namecheap** account.
+2. Navigate to **Profile → Tools**.
+3. Under **Business & Dev Tools**, click **Manage**.
+
+![Step 1](/namecheap/step-1.png)
+
+---
+
+## Step 2: Enable the Namecheap API
+
+1. Enable the **Namecheap API**.
+2. Copy your **API token** and store it securely.
+3. Whitelist the **IP address of your DezerX Spartan instance**.
+4. Click **Done** to save your changes.
+
+![Step 2](/namecheap/step-2.png)
+
+---
+
+## Step 3: Configure DezerX Spartan
+
+1. Open **DezerX Spartan**.
+2. Go to **Admin → Modules → Services**.
+3. Select the **Namecheap** service.
+4. Fill in all required fields using your Namecheap API details.
+
+![Step 3](/namecheap/step-3.png)
+
+---
+
+## Important Notes
+
+* This module **does not support creating products** directly.
+* To use Namecheap services:
+
+  1. Enable the integration inside the Namecheap module.
+  2. Access it from the **main client portal**, for example:
+
+     ```
+     https://example.com/
+     ```
+
+Once enabled, Namecheap functionality will be available through the main portal rather than the admin product system.
+
+---
