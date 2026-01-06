@@ -90,7 +90,6 @@ If you encounter any issues:
 - Check that the `allowed_origins` configuration includes your DezerX dashboard URL
 - Make sure the Wings service has been restarted after configuration changes
 
-
 # Port Array Configuration Guide
 
 ## Table of Contents
@@ -123,6 +122,22 @@ The **Port Array** feature allows you to automatically assign specific ports (an
 2. **Environment variables are created** for the egg (except for "NONE")
 3. **IP restrictions are enforced** if specified
 
+### Port Allocation Fallback Logic
+
+When a requested port is not available, the system uses a **three-tier fallback strategy**:
+
+1. **Try exact port first** - Attempts to allocate the exact port you specified (e.g., 25565)
+2. **Fallback to next higher port** - If exact port is unavailable, finds the next available port **higher** than requested
+   - Sorts available higher ports in ascending order
+   - Selects the **lowest higher port**
+   - Example: If 25565 is taken, might allocate 25568, 25570, or 26668 (whichever is next available)
+3. **Last resort** - Allocates any available port on the node
+
+**Important Notes:**
+- The system does NOT automatically increment by 1 (25565 → 25566)
+- It finds whatever higher port is **actually available** in the node's allocations
+- With IP restrictions, the same logic applies but only considers ports on the allowed IPs
+
 ### Two types of port assignments:
 
 | Type | Format | Creates Environment Variable? |
@@ -148,11 +163,13 @@ The **Port Array** feature allows you to automatically assign specific ports (an
 
 | Format | Example | Description |
 |--------|---------|-------------|
-| **Port only** | `25565` | Any available IP with this port |
-| **Single IP** | `"192.168.1.100:25565"` | Specific IP with this port |
-| **Multiple IPs** | `"192.168.1.100,192.168.1.101:25565"` | First available from these IPs |
-| **Port array** | `[25565, 25566]` | Multiple ports (any IP) |
-| **IP + Port array** | `["192.168.1.100:25565", "192.168.1.100:25566"]` | Multiple specific IP:port combinations |
+| **Port only** | `25565` | Any available IP with this port (or next higher if unavailable) |
+| **Single IP** | `"192.168.1.100:25565"` | Specific IP with this port (or next higher on same IP) |
+| **Multiple IPs** | `"192.168.1.100,192.168.1.101:25565"` | First available from these IPs (tries exact port, then higher) |
+| **Port array** | `[25565, 25566]` | Multiple ports (any IP, with fallback per port) |
+| **IP + Port array** | `["192.168.1.100:25565", "192.168.1.100:25566"]` | Multiple specific IP:port combinations (with fallback per port) |
+
+**Note:** All formats support automatic fallback to next available higher port if the exact requested port is unavailable.
 
 ### String vs Array
 
@@ -182,8 +199,12 @@ The **Port Array** feature allows you to automatically assign specific ports (an
 ```
 
 **Result:**
-- Allocates any available port 25565 → Sets `SERVER_PORT=25565`
-- Allocates any available port 27015 → Sets `QUERY_PORT=27015`
+- Attempts to allocate port 25565 → Sets `SERVER_PORT=25565`
+  - If 25565 is unavailable, falls back to next higher available port (e.g., 25568, 25570, etc.)
+- Attempts to allocate port 27015 → Sets `QUERY_PORT=27015`
+  - If 27015 is unavailable, falls back to next higher available port
+
+**Note:** The port number in the environment variable will reflect the **actual allocated port**, not necessarily the requested one
 
 ---
 
@@ -199,9 +220,11 @@ The **Port Array** feature allows you to automatically assign specific ports (an
 ```
 
 **Result:**
-- Allocates port 25565 on 192.168.1.100 → Sets `SERVER_PORT=25565`
-- Allocates port 27015 on 192.168.1.100 → Sets `QUERY_PORT=27015`
-- ❌ Will fail if those ports on that IP are not available
+- Attempts to allocate port 25565 on 192.168.1.100 → Sets `SERVER_PORT=25565`
+  - If 25565 is taken on this IP, falls back to next higher port on 192.168.1.100 (e.g., 25570, 26000, etc.)
+- Attempts to allocate port 27015 on 192.168.1.100 → Sets `QUERY_PORT=27015`
+  - If 27015 is taken on this IP, falls back to next higher port on 192.168.1.100
+- ❌ Will fail ONLY if the IP has **no available ports at all** (not just if the exact port is taken)
 
 ---
 
@@ -400,24 +423,54 @@ The **Port Array** feature allows you to automatically assign specific ports (an
 
 ## Troubleshooting
 
+### Understanding Port Fallback Behavior
+
+**Question:** "I requested port 25565 but got 25570 instead - is this a bug?"
+
+**Answer:** No, this is expected behavior! The system uses intelligent port fallback:
+
+1. **Tries exact port first** (25565)
+2. **If unavailable**, finds next higher port (25570, 26000, 26668, etc.)
+3. **Environment variable reflects actual port** assigned
+
+**Example Scenario:**
+```json
+{
+  "SERVER_PORT": "192.168.1.100:25565"
+}
+```
+
+**If ports on 192.168.1.100 are:**
+- 25565 ❌ (assigned)
+- 25566 ❌ (assigned)
+- 25567 ❌ (assigned)
+- 25570 ✅ (available) ← **System allocates this**
+- 26668 ✅ (available)
+
+**Result:** `SERVER_PORT=25570` (not 25565, not 25566, but 25570 - the lowest available higher port)
+
+**When does it fail?** Only when **no ports are available** on the specified IP(s), not just when the exact port is taken.
+
+---
+
 ### Error: "Could not find a port to assign"
 
 **Possible causes:**
 1. The specified IP doesn't exist on the node
-2. The port is already assigned on that IP
-3. No available allocations on the node
+2. **ALL ports** on that IP are already assigned (not just the requested port)
+3. No available allocations on the node at all
 
 **Solutions:**
 - Check Pterodactyl → Nodes → Allocations
-- Ensure the IP is created and has unassigned ports
-- Add more allocations to the node
+- Ensure the IP is created and has **any** unassigned ports (fallback will handle different port numbers)
+- Add more port allocations to the IP
 - Use multiple IP options: `"192.168.1.100,192.168.1.101:25565"`
 
 ---
 
 ### Error: "No allocation found matching IP restrictions"
 
-**Cause:** None of the specified IPs have the requested port available
+**Cause:** None of the specified IPs have **any available ports** (not just the exact port)
 
 **Solution:**
 ```json
@@ -427,6 +480,8 @@ The **Port Array** feature allows you to automatically assign specific ports (an
 // Try adding fallback IPs:
 "SERVER_PORT": "192.168.1.100,192.168.1.101,192.168.1.102:25565"
 ```
+
+**Or:** Add more unassigned port allocations to the specified IP(s) in Pterodactyl
 
 ---
 
