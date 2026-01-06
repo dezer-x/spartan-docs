@@ -89,3 +89,481 @@ If you encounter any issues:
 - Ensure your Pterodactyl panel URL is correct and accessible
 - Check that the `allowed_origins` configuration includes your DezerX dashboard URL
 - Make sure the Wings service has been restarted after configuration changes
+
+
+# Port Array Configuration Guide
+
+## Table of Contents
+- [Introduction](#introduction)
+- [Basic Concepts](#basic-concepts)
+- [Syntax & Format](#syntax--format)
+- [Examples](#examples)
+- [Common Use Cases](#common-use-cases)
+- [Troubleshooting](#troubleshooting)
+- [Best Practices](#best-practices)
+
+---
+
+## Introduction
+
+The **Port Array** feature allows you to automatically assign specific ports (and optionally restrict them to specific IPs) when creating Pterodactyl servers. This is useful for:
+
+- Reserving specific IPs for specific products
+- Preventing IP conflicts between different products
+- Managing multiple dedicated IPs on the same node
+- Allocating multiple ports to a single server
+
+---
+
+## Basic Concepts
+
+### What happens when you configure a port array?
+
+1. **Ports are allocated** to the server from Pterodactyl
+2. **Environment variables are created** for the egg (except for "NONE")
+3. **IP restrictions are enforced** if specified
+
+### Two types of port assignments:
+
+| Type | Format | Creates Environment Variable? |
+|------|--------|-------------------------------|
+| **Named** | `"SERVER_PORT": "25565"` | ✅ Yes - Creates `SERVER_PORT=25565` |
+| **Unnamed (NONE)** | `"NONE": ["7778", "7779"]` | ❌ No - Just allocates the ports |
+
+---
+
+## Syntax & Format
+
+### Basic Structure
+
+```json
+{
+  "VARIABLE_NAME": PORT_SPECIFICATION,
+  "ANOTHER_VARIABLE": PORT_SPECIFICATION,
+  "NONE": [PORT_SPECIFICATION, PORT_SPECIFICATION]
+}
+```
+
+### Port Specification Formats
+
+| Format | Example | Description |
+|--------|---------|-------------|
+| **Port only** | `25565` | Any available IP with this port |
+| **Single IP** | `"192.168.1.100:25565"` | Specific IP with this port |
+| **Multiple IPs** | `"192.168.1.100,192.168.1.101:25565"` | First available from these IPs |
+| **Port array** | `[25565, 25566]` | Multiple ports (any IP) |
+| **IP + Port array** | `["192.168.1.100:25565", "192.168.1.100:25566"]` | Multiple specific IP:port combinations |
+
+### String vs Array
+
+- **String**: Allocate ONE port
+  ```json
+  "SERVER_PORT": "192.168.1.100:25565"
+  ```
+
+- **Array**: Allocate MULTIPLE ports
+  ```json
+  "NONE": ["192.168.1.100:7778", "192.168.1.100:7779"]
+  ```
+
+---
+
+## Examples
+
+### Example 1: Basic Port Assignment (No IP Restriction)
+
+**Use case:** Simple server that needs 2 ports, any IP is fine
+
+```json
+{
+  "SERVER_PORT": 25565,
+  "QUERY_PORT": 27015
+}
+```
+
+**Result:**
+- Allocates any available port 25565 → Sets `SERVER_PORT=25565`
+- Allocates any available port 27015 → Sets `QUERY_PORT=27015`
+
+---
+
+### Example 2: Single IP Restriction
+
+**Use case:** You want this product to ONLY use IP 192.168.1.100
+
+```json
+{
+  "SERVER_PORT": "192.168.1.100:25565",
+  "QUERY_PORT": "192.168.1.100:27015"
+}
+```
+
+**Result:**
+- Allocates port 25565 on 192.168.1.100 → Sets `SERVER_PORT=25565`
+- Allocates port 27015 on 192.168.1.100 → Sets `QUERY_PORT=27015`
+- ❌ Will fail if those ports on that IP are not available
+
+---
+
+### Example 3: Multiple IP Options (Fallback)
+
+**Use case:** Try IP .100 first, fallback to .101 if not available
+
+```json
+{
+  "SERVER_PORT": "192.168.1.100,192.168.1.101:25565",
+  "QUERY_PORT": "192.168.1.100,192.168.1.101:27015"
+}
+```
+
+**Result:**
+- Tries to allocate port 25565 on 192.168.1.100
+- If not available, tries 192.168.1.101
+- Sets `SERVER_PORT=25565`
+
+---
+
+### Example 4: Extra Ports with NONE
+
+**Use case:** Minecraft server with voice chat plugin needing extra ports
+
+```json
+{
+  "SERVER_PORT": "192.168.1.100:25565",
+  "QUERY_PORT": "192.168.1.100:27015",
+  "NONE": ["192.168.1.100:7778", "192.168.1.100:7779"]
+}
+```
+
+**Result:**
+- Port 25565 allocated → `SERVER_PORT=25565`
+- Port 27015 allocated → `QUERY_PORT=27015`
+- Ports 7778 & 7779 allocated → No environment variables (just available to server)
+
+---
+
+### Example 5: ARK Server with Multiple Ports
+
+**Use case:** ARK server requiring SERVER_PORT, QUERY_PORT, and RCON_PORT
+
+```json
+{
+  "SERVER_PORT": "192.168.1.50:7777",
+  "QUERY_PORT": "192.168.1.50:27015",
+  "RCON_PORT": "192.168.1.50:27020",
+  "NONE": ["192.168.1.50:7778"]
+}
+```
+
+**Result:**
+- 4 ports allocated, all on 192.168.1.50
+- 3 environment variables created (SERVER_PORT, QUERY_PORT, RCON_PORT)
+- 1 additional port (7778) with no environment variable
+
+---
+
+### Example 6: Reserved IP Pool
+
+**Use case:** You have 6 IPs but want this product to only use 2 specific ones
+
+```json
+{
+  "SERVER_PORT": "192.168.1.100,192.168.1.101:25565",
+  "QUERY_PORT": "192.168.1.100,192.168.1.101:27015",
+  "RCON_PORT": "192.168.1.100,192.168.1.101:27020"
+}
+```
+
+**Result:**
+- All ports will ONLY be allocated from 192.168.1.100 or 192.168.1.101
+- Other IPs (192.168.1.102-106) remain reserved/unused by this product
+
+---
+
+### Example 7: Multiple Port Ranges
+
+**Use case:** FiveM server needing main port + 3 additional ports
+
+```json
+{
+  "SERVER_PORT": "192.168.1.200:30120",
+  "NONE": [
+    "192.168.1.200:30121",
+    "192.168.1.200:30122",
+    "192.168.1.200:30123"
+  ]
+}
+```
+
+**Result:**
+- Port 30120 → `SERVER_PORT=30120`
+- Ports 30121-30123 allocated but no environment variables
+
+---
+
+### Example 8: Mixed IP Restrictions
+
+**Use case:** Main port on dedicated IP, extra ports on shared IP
+
+```json
+{
+  "SERVER_PORT": "192.168.1.100:25565",
+  "QUERY_PORT": 27015,
+  "NONE": [7778, 7779]
+}
+```
+
+**Result:**
+- Port 25565 MUST be on 192.168.1.100
+- Port 27015 can be on ANY available IP
+- Ports 7778-7779 can be on ANY available IP
+
+---
+
+## Common Use Cases
+
+### Use Case 1: IP Segregation for Different Products
+
+**Scenario:** You sell 3 products (Bronze, Silver, Gold) and want to segregate them by IP
+
+**Bronze Product (Budget IPs):**
+```json
+{
+  "SERVER_PORT": "192.168.1.200,192.168.1.201:25565"
+}
+```
+
+**Silver Product (Mid-tier IPs):**
+```json
+{
+  "SERVER_PORT": "192.168.1.100,192.168.1.101:25565"
+}
+```
+
+**Gold Product (Premium IPs):**
+```json
+{
+  "SERVER_PORT": "192.168.1.10,192.168.1.11:25565"
+}
+```
+
+---
+
+### Use Case 2: DDoS Protection IP Pools
+
+**Scenario:** You have DDoS-protected IPs and want only specific products to use them
+
+```json
+{
+  "SERVER_PORT": "192.168.1.50,192.168.1.51,192.168.1.52:25565",
+  "QUERY_PORT": "192.168.1.50,192.168.1.51,192.168.1.52:27015"
+}
+```
+
+**Result:** This product will ONLY use your 3 DDoS-protected IPs
+
+---
+
+### Use Case 3: Multi-Port Game Servers
+
+**Scenario:** Rust server needing RCON + App port
+
+```json
+{
+  "SERVER_PORT": "192.168.1.100:28015",
+  "RCON_PORT": "192.168.1.100:28016",
+  "APP_PORT": "192.168.1.100:28082"
+}
+```
+
+---
+
+### Use Case 4: Reserved Development IPs
+
+**Scenario:** Keep specific IPs for testing/development servers
+
+**Production Products:**
+```json
+{
+  "SERVER_PORT": "192.168.1.100,192.168.1.101,192.168.1.102:25565"
+}
+```
+
+**Development Products:**
+```json
+{
+  "SERVER_PORT": "192.168.1.200,192.168.1.201:25565"
+}
+```
+
+---
+
+## Troubleshooting
+
+### Error: "Could not find a port to assign"
+
+**Possible causes:**
+1. The specified IP doesn't exist on the node
+2. The port is already assigned on that IP
+3. No available allocations on the node
+
+**Solutions:**
+- Check Pterodactyl → Nodes → Allocations
+- Ensure the IP is created and has unassigned ports
+- Add more allocations to the node
+- Use multiple IP options: `"192.168.1.100,192.168.1.101:25565"`
+
+---
+
+### Error: "No allocation found matching IP restrictions"
+
+**Cause:** None of the specified IPs have the requested port available
+
+**Solution:**
+```json
+// Instead of:
+"SERVER_PORT": "192.168.1.100:25565"
+
+// Try adding fallback IPs:
+"SERVER_PORT": "192.168.1.100,192.168.1.101,192.168.1.102:25565"
+```
+
+---
+
+### Server created but using wrong IP
+
+**Cause:** Port specified without IP restriction
+
+**Solution:**
+```json
+// Wrong - any IP:
+"SERVER_PORT": 25565
+
+// Correct - specific IP:
+"SERVER_PORT": "192.168.1.100:25565"
+```
+
+---
+
+### Multiple servers sharing the same IP when they shouldn't
+
+**Cause:** No IP restrictions in port_array
+
+**Solution:** Add IP restrictions to each product to segregate them
+
+---
+
+## Best Practices
+
+### 1. Always Use IP Restrictions for Production
+
+```json
+// ❌ Bad - random IP assignment
+{
+  "SERVER_PORT": 25565
+}
+
+// ✅ Good - controlled IP assignment
+{
+  "SERVER_PORT": "192.168.1.100,192.168.1.101:25565"
+}
+```
+
+---
+
+### 2. Provide Multiple IP Options for Reliability
+
+```json
+// ❌ Risky - only one IP option
+{
+  "SERVER_PORT": "192.168.1.100:25565"
+}
+
+// ✅ Better - fallback options
+{
+  "SERVER_PORT": "192.168.1.100,192.168.1.101,192.168.1.102:25565"
+}
+```
+
+---
+
+### 3. Use NONE for Extra Ports
+
+```json
+// ✅ Clean - extra ports in NONE
+{
+  "SERVER_PORT": "192.168.1.100:25565",
+  "QUERY_PORT": "192.168.1.100:27015",
+  "NONE": ["192.168.1.100:7778", "192.168.1.100:7779"]
+}
+```
+
+---
+
+### 4. Document Your IP Allocation Strategy
+
+Create a spreadsheet or document:
+
+| IP Range | Purpose | Products Using It |
+|----------|---------|-------------------|
+| 192.168.1.10-19 | Premium/Gold | Gold Minecraft, Gold ARK |
+| 192.168.1.100-109 | Standard | Standard Minecraft, Standard ARK |
+| 192.168.1.200-209 | Budget | Bronze Minecraft |
+
+---
+
+### 5. Test Port Arrays Before Going Live
+
+1. Create a test product with your port_array configuration
+2. Try creating a server manually
+3. Check which IP was assigned
+4. Verify environment variables in Pterodactyl
+
+---
+
+### 6. Keep Port Arrays Consistent Per Game Type
+
+**Minecraft Products:**
+```json
+{
+  "SERVER_PORT": "IP_LIST:25565",
+  "QUERY_PORT": "IP_LIST:25575"
+}
+```
+
+**ARK Products:**
+```json
+{
+  "SERVER_PORT": "IP_LIST:7777",
+  "QUERY_PORT": "IP_LIST:27015",
+  "RCON_PORT": "IP_LIST:27020"
+}
+```
+
+---
+
+## Quick Reference
+
+### Format Cheat Sheet
+
+```json
+{
+  // Single port, any IP
+  "VAR1": 25565,
+
+  // Single port, specific IP
+  "VAR2": "192.168.1.100:25565",
+
+  // Single port, multiple IP options (fallback)
+  "VAR3": "192.168.1.100,192.168.1.101:25565",
+
+  // Multiple ports, any IP
+  "VAR4": [7778, 7779],
+
+  // Multiple ports, specific IP
+  "VAR5": ["192.168.1.100:7778", "192.168.1.100:7779"],
+
+  // Extra ports (no environment variables)
+  "NONE": ["192.168.1.100:8080", "192.168.1.100:8081"]
+}
+```
