@@ -1,0 +1,331 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "DezerX — License Service",
+    "version": "1.0.0",
+    "description": "Endpoints called by **external software** (e.g. plugins, desktop apps) to verify licenses and obtain download tokens.\n\nThese are **not** admin endpoints — they are called directly from the end-user's server/installation.\n\n**Base URL:** `https://example.com/api/license`\n\n**Authentication:** `Authorization: Bearer <license_key>`\n\nEvery protected request must also supply `domain` and `product_id` via:\n- Query string / request body — preferred\n- HTTP headers `X-Domain` and `X-Product-ID` — alternative\n\n### Middleware check order (all protected endpoints)\nThe `LicenseAuthMiddleware` validates requests in this exact order:\n\n| # | Check | Error code | HTTP |\n|---|---|---|---|\n| 1 | Rate limit (default 60 req/min per IP) | `RATE_LIMIT_EXCEEDED` | 429 |\n| 2 | `Authorization: Bearer <key>` present | `MISSING_AUTHORIZATION` | 401 |\n| 3 | License key is not empty | `MISSING_LICENSE_KEY` | 401 |\n| 4 | `domain` field/header present | `MISSING_DOMAIN` | 400 |\n| 5 | Domain not blacklisted | `DOMAIN_BLACKLISTED` | 403 |\n| 6 | Client IP not blacklisted | `IP_BLACKLISTED` | 403 |\n| 7 | `product_id` field/header present | `MISSING_PRODUCT_ID` | 400 |\n| 8 | License key exists in database | `INVALID_LICENSE` | 401 |\n| 9 | License not blacklisted | `LICENSE_BLACKLISTED` | 403 |\n| 10 | `is_active = true` | `INACTIVE_LICENSE` | 403 |\n| 11 | `license.product_id == product_id` | `PRODUCT_ID_MISMATCH` | 403 |\n| 12 | IP matches (if IP restriction is set and ≠ `0.0.0.0`) | `IP_ADDRESS_MISMATCH` | 403 |\n| 13 | Domain matches (first request captures domain, subsequent must match) | `DOMAIN_MISMATCH` | 403 |\n\nDomain comparison strips `https?://`, `www.`, trailing slashes, and is case-insensitive.\n\nAll requests are tracked in `license_requests` with a calculated risk score. Repeated failures can trigger auto-blacklisting."
+  },
+  "servers": [
+    {
+      "url": "https://example.com/api/license",
+      "description": "License Service API (replace example.com with your domain)"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "LicenseKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "The `license_key` stored in `module_licenses` for the calling installation."
+      }
+    },
+    "schemas": {
+      "LicenseErrorResponse": {
+        "type": "object",
+        "required": ["success","message","error_code"],
+        "properties": {
+          "success":    { "type": "boolean", "example": false },
+          "message":    { "type": "string" },
+          "error_code": { "type": "string", "enum": [
+            "RATE_LIMIT_EXCEEDED",
+            "MISSING_AUTHORIZATION",
+            "MISSING_LICENSE_KEY",
+            "MISSING_DOMAIN",
+            "DOMAIN_BLACKLISTED",
+            "IP_BLACKLISTED",
+            "MISSING_PRODUCT_ID",
+            "INVALID_LICENSE",
+            "LICENSE_BLACKLISTED",
+            "INACTIVE_LICENSE",
+            "PRODUCT_ID_MISMATCH",
+            "IP_ADDRESS_MISMATCH",
+            "DOMAIN_MISMATCH"
+          ]}
+        }
+      },
+      "LicenseVerifyData": {
+        "type": "object",
+        "properties": {
+          "license_id":       { "type": "integer", "example": 1 },
+          "license_key":      { "type": "string",  "example": "MYPRODUCT_ABCDE12345FGHIJ" },
+          "product_id":       { "type": "integer", "example": 3 },
+          "product_name":     { "type": "string",  "example": "Starter VPS" },
+          "user_id":          { "type": "integer", "example": 42 },
+          "is_active":        { "type": "boolean", "example": true },
+          "last_rotated":     { "type": "string",  "format": "date-time", "nullable": true },
+          "created_at":       { "type": "string",  "format": "date-time" },
+          "domain":           { "type": "string",  "nullable": true, "example": "example.com", "description": "The domain captured/registered for this license" },
+          "version": {
+            "type": "string",
+            "nullable": true,
+            "example": "2.1.0",
+            "description": "From product.module_config.version"
+          },
+          "is_white_labeled": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "From product.module_config.is_white_labeled"
+          }
+        }
+      },
+      "DownloadTokenData": {
+        "type": "object",
+        "properties": {
+          "download_url": {
+            "type": "string",
+            "example": "https://example.com/api/license/download-file/a8f3c2d1e9b4f7a2c6d8e1f3b5a9c2d4e6f8a1b3c5d7e9f2a4b6c8d0e2f4a6b8",
+            "description": "Single-use URL valid for 24 hours. No authentication required."
+          },
+          "expires_at":             { "type": "string",  "format": "date-time", "example": "2026-02-26T10:30:00Z" },
+          "product_name":           { "type": "string",  "example": "Starter VPS" },
+          "file_size":              { "type": "integer", "example": 2048000, "description": "File size in bytes" },
+          "ip_address_captured":    { "type": "string",  "nullable": true, "example": "203.0.113.5", "description": "The IP captured on this request (set on license if first time)" },
+          "license_ip_restriction": { "type": "string",  "nullable": true, "example": "203.0.113.5", "description": "The IP restriction currently recorded on the license" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/verify": {
+      "get": {
+        "tags": ["License"],
+        "summary": "Verify a license key",
+        "description": "Validates the calling license against all middleware checks (see description above) and returns the license details plus product metadata from `module_config`.\n\nA request tracking record is written to `license_requests` after the response is sent (terminable middleware).",
+        "security": [{ "LicenseKey": [] }],
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "example": "example.com" },
+            "description": "Originating domain. Also accepted via `X-Domain` header."
+          },
+          {
+            "name": "product_id",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "integer", "example": 3 },
+            "description": "Product ID this license belongs to. Also accepted via `X-Product-ID` header."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "License is valid and active",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "message": { "type": "string",  "example": "License is valid and active" },
+                    "data":    { "$ref": "#/components/schemas/LicenseVerifyData" }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "message": "License is valid and active",
+                  "data": {
+                    "license_id": 1,
+                    "license_key": "MYPRODUCT_ABCDE12345FGHIJ",
+                    "product_id": 3,
+                    "product_name": "Starter VPS",
+                    "user_id": 42,
+                    "is_active": true,
+                    "last_rotated": null,
+                    "created_at": "2026-01-15T09:00:00Z",
+                    "domain": "example.com",
+                    "version": "2.1.0",
+                    "is_white_labeled": false
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing domain or product_id",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LicenseErrorResponse" },
+                "examples": {
+                  "missing_domain":      { "value": { "success": false, "message": "Domain is required",     "error_code": "MISSING_DOMAIN" } },
+                  "missing_product_id":  { "value": { "success": false, "message": "Product ID is required", "error_code": "MISSING_PRODUCT_ID" } }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LicenseErrorResponse" },
+                "examples": {
+                  "missing_auth":    { "value": { "success": false, "message": "Authorization header missing or invalid format", "error_code": "MISSING_AUTHORIZATION" } },
+                  "missing_key":     { "value": { "success": false, "message": "License key is required",  "error_code": "MISSING_LICENSE_KEY" } },
+                  "invalid_license": { "value": { "success": false, "message": "Invalid license key",      "error_code": "INVALID_LICENSE" } }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LicenseErrorResponse" },
+                "examples": {
+                  "domain_blacklisted":  { "value": { "success": false, "message": "This domain is blacklisted and cannot make requests",     "error_code": "DOMAIN_BLACKLISTED" } },
+                  "ip_blacklisted":      { "value": { "success": false, "message": "This IP address is blacklisted and cannot make requests",  "error_code": "IP_BLACKLISTED" } },
+                  "license_blacklisted": { "value": { "success": false, "message": "This license is blacklisted and cannot make requests",     "error_code": "LICENSE_BLACKLISTED" } },
+                  "inactive":            { "value": { "success": false, "message": "License is inactive or suspended",                         "error_code": "INACTIVE_LICENSE" } },
+                  "product_mismatch":    { "value": { "success": false, "message": "Product ID mismatch. License not valid for this product.", "error_code": "PRODUCT_ID_MISMATCH" } },
+                  "ip_mismatch":         { "value": { "success": false, "message": "IP address not authorized for this license",               "error_code": "IP_ADDRESS_MISMATCH" } },
+                  "domain_mismatch":     { "value": { "success": false, "message": "Domain mismatch. License not valid for this domain.",      "error_code": "DOMAIN_MISMATCH" } }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LicenseErrorResponse" },
+                "example": { "success": false, "message": "Too many requests. Please try again later.", "error_code": "RATE_LIMIT_EXCEEDED" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/download": {
+      "post": {
+        "tags": ["License"],
+        "summary": "Request a download token",
+        "description": "Generates a one-time, 24-hour download token for the product file associated with the license.\n\nAdditional checks beyond standard middleware:\n1. `product.module_config.product_file` must be set — otherwise **404**.\n2. `product.module_config.is_downloadable_via_api` must not be `0` — otherwise **403**.\n3. The physical file must exist in `storage/app/private/{path}` or `public/{path}` — otherwise **404**.\n\nOn the first call, the client's IP is captured against the license (if no IP restriction is already recorded).\n\nThe returned `download_url` is single-use and requires no authentication.",
+        "security": [{ "LicenseKey": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["domain","product_id"],
+                "properties": {
+                  "domain":     { "type": "string",  "example": "example.com" },
+                  "product_id": { "type": "integer", "example": 3 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Download token generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "message": { "type": "string",  "example": "Download token generated successfully" },
+                    "data":    { "$ref": "#/components/schemas/DownloadTokenData" }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "message": "Download token generated successfully",
+                  "data": {
+                    "download_url": "https://example.com/api/license/download-file/a8f3c2d1e9b4f7a2c6d8e1f3b5a9c2d4e6f8a1b3c5d7e9f2a4b6c8d0e2f4a6b8",
+                    "expires_at": "2026-02-26T10:30:00Z",
+                    "product_name": "Starter VPS",
+                    "file_size": 2048000,
+                    "ip_address_captured": "203.0.113.5",
+                    "license_ip_restriction": "203.0.113.5"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing domain or product_id",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LicenseErrorResponse" } } }
+          },
+          "401": {
+            "description": "Authentication failed",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LicenseErrorResponse" } } }
+          },
+          "403": {
+            "description": "License access denied or API download disabled for this product",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/LicenseErrorResponse" },
+                    { "type": "object", "properties": { "success": { "type": "boolean", "example": false }, "message": { "type": "string", "example": "API download is disabled for this product" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No product file configured or file not found on disk",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "success": { "type": "boolean", "example": false }, "message": { "type": "string" } } },
+                "examples": {
+                  "no_file_configured": { "value": { "success": false, "message": "No downloadable file available for this product" } },
+                  "file_not_found":     { "value": { "success": false, "message": "Product file not found" } }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LicenseErrorResponse" }, "example": { "success": false, "message": "Too many requests. Please try again later.", "error_code": "RATE_LIMIT_EXCEEDED" } } }
+          }
+        }
+      }
+    },
+    "/download-file/{token}": {
+      "get": {
+        "tags": ["License"],
+        "summary": "Download a product file",
+        "description": "Streams the product file to the caller using a download token. **No authentication required** — the token itself acts as the credential.\n\nThe token must:\n- exist in `download_tokens`\n- have `is_used = false`\n- not be expired (`expires_at > now()`)\n\nThe token is marked `is_used = true` immediately before streaming begins (single-use).\n\nResponse headers on success:\n```\nContent-Disposition: attachment; filename=\"<filename>\"\nCache-Control: no-cache, no-store, must-revalidate\nPragma: no-cache\nExpires: 0\n```\n\nAll download-file requests (including failures) are tracked in `license_requests`.",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "example": "a8f3c2d1e9b4f7a2c6d8e1f3b5a9c2d4e6f8a1b3c5d7e9f2a4b6c8d0e2f4a6b8" },
+            "description": "64-character random download token from POST /download"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File stream",
+            "headers": {
+              "Content-Disposition": { "schema": { "type": "string" }, "example": "attachment; filename=\"product.zip\"" },
+              "Cache-Control":       { "schema": { "type": "string" }, "example": "no-cache, no-store, must-revalidate" }
+            },
+            "content": {
+              "application/octet-stream": {
+                "schema": { "type": "string", "format": "binary" }
+              }
+            }
+          },
+          "404": {
+            "description": "Token invalid, already used, expired, or product file missing",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "success": { "type": "boolean", "example": false }, "message": { "type": "string" } } },
+                "examples": {
+                  "bad_token":    { "value": { "success": false, "message": "Invalid or expired download token" } },
+                  "file_missing": { "value": { "success": false, "message": "Product file does not exist" } },
+                  "no_file_configured": { "value": { "success": false, "message": "Product file not found" } }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

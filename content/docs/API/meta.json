@@ -3,7 +3,12 @@
     "description": "Official API Documentation",
     "icon": "Braces",
     "pages": [
-        "users", "tickets"
+        "services",
+        "users",
+        "tickets",
+        "products",
+        "categories",
+        "coupons"
     ],  
     "root": true
 }

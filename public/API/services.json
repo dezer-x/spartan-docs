@@ -1,0 +1,416 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "DezerX — Services",
+    "version": "1.0.0",
+    "description": "Create and manage customer services (product-based and custom).\n\n**Base URL:** `https://example.com/api/application`\n\n**Authentication:** `Authorization: Bearer <api_token>`\n\n### Permissions required\n| Endpoint | Permission |\n|---|---|\n| `GET /services` | `services.index` |\n| `GET /services/{id}` | `services.show` |\n| `POST /services` | `services.create` |\n| `POST /services/{id}/activate` | `services.activate` |\n| `POST /services/{id}/suspend` | `services.suspend` |\n| `POST /services/{id}/unsuspend` | `services.unsuspend` |\n| `POST /services/{id}/terminate` | `services.terminate` |\n| `PUT /services/{id}/pricing` | `services.updatePricing` |\n| `PUT /services/{id}/due-date` | `services.updateDueDate` |\n| `PUT /services/{id}/owner` | `services.updateOwner` |"
+  },
+  "servers": [
+    {
+      "url": "https://example.com/api/application",
+      "description": "Application API (replace example.com with your domain)"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApplicationApiToken": { "type": "http", "scheme": "bearer" }
+    },
+    "schemas": {
+      "UserMinimal": {
+        "type": "object",
+        "properties": {
+          "id":    { "type": "integer", "example": 42 },
+          "name":  { "type": "string",  "example": "Jane Doe" },
+          "email": { "type": "string",  "format": "email", "example": "jane@example.com" }
+        }
+      },
+      "ProductMinimal": {
+        "type": "object",
+        "properties": {
+          "id":   { "type": "integer", "example": 3 },
+          "name": { "type": "string",  "example": "Starter VPS" }
+        }
+      },
+      "CategoryMinimal": {
+        "type": "object",
+        "properties": {
+          "id":   { "type": "integer", "example": 2 },
+          "name": { "type": "string",  "example": "VPS Hosting" }
+        }
+      },
+      "ServiceFull": {
+        "type": "object",
+        "properties": {
+          "id":                   { "type": "integer", "example": 7 },
+          "service_name":         { "type": "string",  "nullable": true, "example": "My VPS", "description": "Only set for custom services" },
+          "product_id":           { "type": "integer", "nullable": true, "example": 3 },
+          "category_id":          { "type": "integer", "nullable": true, "example": 2 },
+          "owner_id":             { "type": "integer", "example": 42 },
+          "price":                { "type": "string",  "example": "9.99" },
+          "original_price":       { "type": "string",  "nullable": true, "example": "12.99" },
+          "modified_pricing":     { "type": "object",  "nullable": true, "description": "Custom pricing overrides per billing cycle" },
+          "coupon_id":            { "type": "integer", "nullable": true },
+          "has_lifetime_discount":{ "type": "boolean", "example": false },
+          "billing_cycle":        { "type": "string",  "example": "monthly" },
+          "status":               { "type": "string",  "enum": ["pending","active","suspended","terminated"], "example": "active" },
+          "due_date":             { "type": "string",  "format": "date-time", "nullable": true },
+          "payment_method":       { "type": "string",  "nullable": true, "example": "stripe" },
+          "recurring":            { "type": "boolean", "nullable": true },
+          "auto_renewal_enabled": { "type": "boolean", "example": true },
+          "last_reminded":        { "type": "string",  "format": "date-time", "nullable": true },
+          "last_renewed":         { "type": "string",  "format": "date-time", "nullable": true },
+          "module":               { "type": "string",  "nullable": true, "example": "PterodactylService" },
+          "config": {
+            "type": "object",
+            "nullable": true,
+            "description": "Module-specific JSON config (e.g. server ID, domain, custom fields)"
+          },
+          "addons": { "type": "array", "nullable": true },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" },
+          "owner": {
+            "nullable": true,
+            "allOf": [{ "$ref": "#/components/schemas/UserMinimal" }]
+          },
+          "product": {
+            "nullable": true,
+            "allOf": [{ "$ref": "#/components/schemas/ProductMinimal" }]
+          },
+          "category": {
+            "nullable": true,
+            "allOf": [{ "$ref": "#/components/schemas/CategoryMinimal" }]
+          }
+        }
+      },
+      "PaginationMeta": {
+        "type": "object",
+        "properties": {
+          "current_page":   { "type": "integer", "example": 1 },
+          "from":           { "type": "integer", "nullable": true },
+          "last_page":      { "type": "integer" },
+          "per_page":       { "type": "integer", "example": 15 },
+          "to":             { "type": "integer", "nullable": true },
+          "total":          { "type": "integer" },
+          "path":           { "type": "string" },
+          "first_page_url": { "type": "string" },
+          "last_page_url":  { "type": "string" },
+          "next_page_url":  { "type": "string", "nullable": true },
+          "prev_page_url":  { "type": "string", "nullable": true },
+          "links":          { "type": "array",  "items": { "type": "object" } }
+        }
+      },
+      "Error401": { "type": "object", "properties": { "error": { "type": "string" }, "message": { "type": "string" } } },
+      "Error403": { "type": "object", "properties": { "error": { "type": "string" }, "message": { "type": "string" } } },
+      "Error404": { "type": "object", "properties": { "success": { "type": "boolean", "example": false }, "message": { "type": "string", "example": "Service not found" } } },
+      "Error422": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": false },
+          "message": { "type": "string", "example": "Validation failed" },
+          "errors":  { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } }
+        }
+      },
+      "Error500": { "type": "object", "properties": { "success": { "type": "boolean", "example": false }, "message": { "type": "string" } } }
+    }
+  },
+  "paths": {
+    "/services": {
+      "get": {
+        "tags": ["Services"],
+        "summary": "List all services",
+        "description": "Returns a paginated list of services. Each item includes partial `owner` (id, name, email), partial `product` (id, name), and partial `category` (id, name) for performance.\n\n**Required permission:** `services.index`",
+        "security": [{ "ApplicationApiToken": [] }],
+        "parameters": [
+          { "name": "per_page", "in": "query", "schema": { "type": "integer", "default": 15 } },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Searches service_name, related product name, or owner name/email"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["pending","active","suspended","terminated"] }
+          },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated service list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "allOf": [
+                        { "$ref": "#/components/schemas/PaginationMeta" },
+                        { "type": "object", "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/ServiceFull" } } } }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthenticated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error401" } } } },
+          "403": { "description": "Forbidden",       "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error403" } } } }
+        }
+      },
+      "post": {
+        "tags": ["Services"],
+        "summary": "Create a service",
+        "description": "Creates a new service. Two modes based on `service_type`:\n\n**`product` mode** — links to an existing product. If `billing_cycle` is supplied it must exist in the product's `duration_config` and have `enabled: true`.\n\n**`custom` mode** — fully manual service, not attached to any module.\n\n**Required permission:** `services.create`",
+        "security": [{ "ApplicationApiToken": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["user_id","service_type"],
+                "properties": {
+                  "user_id":      { "type": "integer", "example": 42, "description": "Owner user ID" },
+                  "service_type": { "type": "string",  "enum": ["product","custom"] },
+                  "due_date":     { "type": "string",  "format": "date", "description": "Must be after today (optional)" },
+                  "notes":        { "type": "string" },
+                  "product_id":   { "type": "integer", "description": "Required when service_type = product" },
+                  "billing_cycle":{
+                    "type": "string",
+                    "description": "Optional for product, required for custom. Allowed: weekly, monthly, quarterly, semi-annually, annually, yearly, biennially, triennially, lifetime, one-time.",
+                    "example": "monthly"
+                  },
+                  "service_name": { "type": "string",  "maxLength": 255, "description": "Required when service_type = custom" },
+                  "price":        { "type": "number",  "minimum": 0,     "description": "Required when service_type = custom" },
+                  "category_id":  { "type": "integer", "description": "Required when service_type = custom" },
+                  "custom_fields":{ "type": "array",   "description": "Optional when service_type = custom" },
+                  "custom_buttons":{ "type": "array",  "description": "Optional when service_type = custom" }
+                }
+              },
+              "examples": {
+                "product_service": {
+                  "summary": "Product-based service",
+                  "value": { "user_id": 42, "service_type": "product", "product_id": 3, "billing_cycle": "monthly" }
+                },
+                "custom_service": {
+                  "summary": "Custom service",
+                  "value": { "user_id": 42, "service_type": "custom", "service_name": "Managed Backup", "price": 5.00, "billing_cycle": "monthly", "category_id": 2 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Service created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "message": { "type": "string" },
+                    "data":    { "$ref": "#/components/schemas/ServiceFull" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthenticated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error401" } } } },
+          "403": { "description": "Forbidden",       "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error403" } } } },
+          "422": {
+            "description": "Validation failed or billing cycle unavailable/disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    { "$ref": "#/components/schemas/Error422" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success":          { "type": "boolean", "example": false },
+                        "message":          { "type": "string",  "example": "Billing cycle 'weekly' is not available for this product" },
+                        "available_cycles": { "type": "array",   "items": { "type": "string" } }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success":        { "type": "boolean", "example": false },
+                        "message":        { "type": "string",  "example": "Billing cycle 'weekly' is not enabled for this product" },
+                        "enabled_cycles": { "type": "array",   "items": { "type": "string" } }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": { "description": "Internal error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error500" } } } }
+        }
+      }
+    },
+    "/services/{id}": {
+      "get": {
+        "tags": ["Services"],
+        "summary": "Get a specific service",
+        "description": "Returns a single service with `owner`, `product`, and `category` relationships fully loaded.\n\n**Required permission:** `services.show`",
+        "security": [{ "ApplicationApiToken": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 7 }
+        ],
+        "responses": {
+          "200": {
+            "description": "Service found",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean", "example": true }, "data": { "$ref": "#/components/schemas/ServiceFull" } } } } }
+          },
+          "401": { "description": "Unauthenticated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error401" } } } },
+          "403": { "description": "Forbidden",       "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error403" } } } },
+          "404": { "description": "Service not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error404" } } } }
+        }
+      }
+    },
+    "/services/{id}/activate": {
+      "post": {
+        "tags": ["Services"],
+        "summary": "Activate a service",
+        "description": "Activates a service in `pending` status. Returns 400 for any other status.\n\n**Required permission:** `services.activate`",
+        "security": [{ "ApplicationApiToken": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": {
+          "200": { "description": "Service activated", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean", "example": true }, "message": { "type": "string" }, "data": { "$ref": "#/components/schemas/ServiceFull" } } } } } },
+          "400": { "description": "Service is not pending", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error500" }, "example": { "success": false, "message": "Only pending services can be activated" } } } },
+          "401": { "description": "Unauthenticated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error401" } } } },
+          "403": { "description": "Forbidden",       "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error403" } } } },
+          "404": { "description": "Service not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error404" } } } },
+          "500": { "description": "Internal error",  "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error500" } } } }
+        }
+      }
+    },
+    "/services/{id}/suspend": {
+      "post": {
+        "tags": ["Services"],
+        "summary": "Suspend a service",
+        "description": "Suspends the service. If the service has a module, `SuspendServerService::suspendServer()` is called first. If the module call fails, the service is **not** suspended and a 400 is returned.\n\n**Required permission:** `services.suspend`",
+        "security": [{ "ApplicationApiToken": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": {
+          "200": { "description": "Service suspended", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean", "example": true }, "message": { "type": "string", "example": "Service suspended successfully" }, "data": { "$ref": "#/components/schemas/ServiceFull" } } } } } },
+          "400": { "description": "Module suspend call failed", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error500" } } } },
+          "401": { "description": "Unauthenticated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error401" } } } },
+          "403": { "description": "Forbidden",       "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error403" } } } },
+          "404": { "description": "Service not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error404" } } } },
+          "500": { "description": "Internal error",  "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error500" } } } }
+        }
+      }
+    },
+    "/services/{id}/unsuspend": {
+      "post": {
+        "tags": ["Services"],
+        "summary": "Unsuspend a service",
+        "description": "Re-activates a suspended service. If the service has a module, `UnsuspendServerService::unsuspendServer()` is called first.\n\n**Required permission:** `services.unsuspend`",
+        "security": [{ "ApplicationApiToken": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": {
+          "200": { "description": "Service unsuspended", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean", "example": true }, "message": { "type": "string", "example": "Service unsuspended successfully" }, "data": { "$ref": "#/components/schemas/ServiceFull" } } } } } },
+          "400": { "description": "Module unsuspend call failed", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error500" } } } },
+          "401": { "description": "Unauthenticated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error401" } } } },
+          "403": { "description": "Forbidden",       "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error403" } } } },
+          "404": { "description": "Service not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error404" } } } },
+          "500": { "description": "Internal error",  "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error500" } } } }
+        }
+      }
+    },
+    "/services/{id}/terminate": {
+      "post": {
+        "tags": ["Services"],
+        "summary": "Terminate a service",
+        "description": "Terminates the service. Behaviour depends on current status:\n\n| Current status | Outcome |\n|---|---|\n| `terminated` | Hard-deleted immediately. Returns 200. |\n| any other | Module `DeleteServerService::deleteServer()` called if module exists. Success → status set to `terminated`. Failure → hard-deleted locally, returns 400. |\n\n**Required permission:** `services.terminate`",
+        "security": [{ "ApplicationApiToken": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": {
+          "200": {
+            "description": "Terminated (or deleted if was already terminated)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    { "type": "object", "properties": { "success": { "type": "boolean", "example": true }, "message": { "type": "string", "example": "Service terminated successfully" }, "data": { "$ref": "#/components/schemas/ServiceFull" } } },
+                    { "type": "object", "properties": { "success": { "type": "boolean", "example": true }, "message": { "type": "string", "example": "Service was already terminated and has been deleted" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": { "description": "Module terminate failed — service deleted locally", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error500" }, "example": { "success": false, "message": "Service could not be terminated on server. Removed locally." } } } },
+          "401": { "description": "Unauthenticated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error401" } } } },
+          "403": { "description": "Forbidden",       "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error403" } } } },
+          "404": { "description": "Service not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error404" } } } },
+          "500": { "description": "Internal error",  "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error500" } } } }
+        }
+      }
+    },
+    "/services/{id}/pricing": {
+      "put": {
+        "tags": ["Services"],
+        "summary": "Update service price",
+        "description": "Overrides the service's `price` field.\n\n**Required permission:** `services.updatePricing`",
+        "security": [{ "ApplicationApiToken": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "required": ["price"], "properties": { "price": { "type": "number", "minimum": 0, "example": 14.99 } } } } }
+        },
+        "responses": {
+          "200": { "description": "Price updated", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean", "example": true }, "message": { "type": "string", "example": "Service pricing updated successfully" }, "data": { "$ref": "#/components/schemas/ServiceFull" } } } } } },
+          "401": { "description": "Unauthenticated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error401" } } } },
+          "403": { "description": "Forbidden",       "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error403" } } } },
+          "404": { "description": "Service not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error404" } } } },
+          "422": { "description": "Validation failed", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error422" } } } }
+        }
+      }
+    },
+    "/services/{id}/due-date": {
+      "put": {
+        "tags": ["Services"],
+        "summary": "Update service due date",
+        "description": "Sets a new `due_date`. Must be a date after today.\n\n**Required permission:** `services.updateDueDate`",
+        "security": [{ "ApplicationApiToken": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "required": ["due_date"], "properties": { "due_date": { "type": "string", "format": "date", "example": "2026-12-01", "description": "Must be after today" } } } } }
+        },
+        "responses": {
+          "200": { "description": "Due date updated", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean", "example": true }, "message": { "type": "string", "example": "Service due date updated successfully" }, "data": { "$ref": "#/components/schemas/ServiceFull" } } } } } },
+          "401": { "description": "Unauthenticated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error401" } } } },
+          "403": { "description": "Forbidden",       "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error403" } } } },
+          "404": { "description": "Service not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error404" } } } },
+          "422": { "description": "Validation failed", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error422" } } } }
+        }
+      }
+    },
+    "/services/{id}/owner": {
+      "put": {
+        "tags": ["Services"],
+        "summary": "Update service owner",
+        "description": "Transfers the service to a different user by updating `owner_id`.\n\n**Required permission:** `services.updateOwner`",
+        "security": [{ "ApplicationApiToken": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "required": ["user_id"], "properties": { "user_id": { "type": "integer", "example": 55, "description": "ID of the new owner (must exist in users table)" } } } } }
+        },
+        "responses": {
+          "200": { "description": "Owner updated", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean", "example": true }, "message": { "type": "string", "example": "Service owner updated successfully" }, "data": { "$ref": "#/components/schemas/ServiceFull" } } } } } },
+          "401": { "description": "Unauthenticated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error401" } } } },
+          "403": { "description": "Forbidden",       "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error403" } } } },
+          "404": { "description": "Service not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error404" } } } },
+          "422": { "description": "Validation failed", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error422" } } } }
+        }
+      }
+    }
+  }
+}

@@ -1,5 +1,5 @@
 import { createOpenAPI } from 'fumadocs-openapi/server';
 
 export const openapi = createOpenAPI({
-  input: ['./public/API/tickets.json'],
+  input: ['./public/API/services.json'],
 });
