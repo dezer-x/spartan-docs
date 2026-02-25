@@ -1,0 +1,312 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "DezerX — Tickets",
+    "version": "1.0.0",
+    "description": "Create, read, reply to, and manage support tickets.\n\n**Base URL:** `https://example.com/api/application`\n\n**Authentication:** `Authorization: Bearer <api_token>`\n\n### Permissions required\n| Endpoint | Permission |\n|---|---|\n| `GET /tickets` | `tickets.index` |\n| `GET /tickets/{id}` | `tickets.show` |\n| `POST /tickets` | `tickets.create` |\n| `POST /tickets/{id}/reply` | `tickets.reply` |\n| `POST /tickets/{id}/close` | `tickets.close` |\n| `PUT /tickets/{id}/status` | `tickets.update` |"
+  },
+  "servers": [
+    {
+      "url": "https://example.com/api/application",
+      "description": "Application API (replace example.com with your domain)"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApplicationApiToken": { "type": "http", "scheme": "bearer" }
+    },
+    "schemas": {
+      "UserMinimal": {
+        "type": "object",
+        "properties": {
+          "id":    { "type": "integer", "example": 42 },
+          "name":  { "type": "string",  "example": "Jane Doe" },
+          "email": { "type": "string",  "format": "email", "example": "jane@example.com" },
+          "avatar":{ "type": "string",  "nullable": true }
+        }
+      },
+      "ServiceMinimal": {
+        "type": "object",
+        "properties": {
+          "id":           { "type": "integer", "example": 7 },
+          "service_name": { "type": "string",  "nullable": true },
+          "status":       { "type": "string",  "example": "active" }
+        }
+      },
+      "TicketMessage": {
+        "type": "object",
+        "properties": {
+          "id":               { "type": "integer", "example": 1 },
+          "ticket_id":        { "type": "integer", "example": 12 },
+          "user_id":          { "type": "integer", "example": 42, "nullable": true },
+          "message":          { "type": "string",  "example": "Hello, I need help with…" },
+          "is_staff":         { "type": "boolean", "example": false },
+          "attachments":      { "type": "array",   "nullable": true, "items": { "type": "object" } },
+          "user_display_name":{ "type": "string",  "example": "Jane Doe", "description": "Falls back to 'Deleted User' or 'Deleted Staff Member' if user no longer exists" },
+          "user": {
+            "nullable": true,
+            "allOf": [{ "$ref": "#/components/schemas/UserMinimal" }]
+          },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "TicketSummary": {
+        "type": "object",
+        "properties": {
+          "id":                 { "type": "integer", "example": 12 },
+          "name":               { "type": "string",  "example": "Cannot access my server" },
+          "description":        { "type": "string",  "example": "Since this morning my VPS is unreachable." },
+          "status":             { "type": "string",  "enum": ["open","closed","resolved","answered","awaiting"], "example": "open" },
+          "priority":           { "type": "string",  "nullable": true },
+          "department":         { "type": "string",  "example": "Support" },
+          "related_service_id": { "type": "integer", "nullable": true, "example": 7 },
+          "user_id":            { "type": "integer", "example": 42 },
+          "extra_user_ids":     { "type": "array",   "nullable": true, "items": { "type": "integer" } },
+          "unique_identifier":  { "type": "string",  "nullable": true },
+          "user_display_name":  { "type": "string",  "example": "Jane Doe" },
+          "user": {
+            "nullable": true,
+            "allOf": [{ "$ref": "#/components/schemas/UserMinimal" }]
+          },
+          "messages": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/TicketMessage" },
+            "description": "Sorted ascending by created_at"
+          },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "TicketFull": {
+        "allOf": [
+          { "$ref": "#/components/schemas/TicketSummary" },
+          {
+            "type": "object",
+            "properties": {
+              "service": {
+                "nullable": true,
+                "allOf": [{ "$ref": "#/components/schemas/ServiceMinimal" }]
+              }
+            }
+          }
+        ]
+      },
+      "PaginationMeta": {
+        "type": "object",
+        "properties": {
+          "current_page":   { "type": "integer", "example": 1 },
+          "from":           { "type": "integer", "nullable": true },
+          "last_page":      { "type": "integer" },
+          "per_page":       { "type": "integer", "example": 15 },
+          "to":             { "type": "integer", "nullable": true },
+          "total":          { "type": "integer" },
+          "path":           { "type": "string" },
+          "first_page_url": { "type": "string" },
+          "last_page_url":  { "type": "string" },
+          "next_page_url":  { "type": "string", "nullable": true },
+          "prev_page_url":  { "type": "string", "nullable": true },
+          "links":          { "type": "array",  "items": { "type": "object" } }
+        }
+      },
+      "Error401": { "type": "object", "properties": { "error": { "type": "string" }, "message": { "type": "string" } } },
+      "Error403": { "type": "object", "properties": { "error": { "type": "string" }, "message": { "type": "string" } } },
+      "Error404": { "type": "object", "properties": { "success": { "type": "boolean", "example": false }, "message": { "type": "string", "example": "Ticket not found" } } },
+      "Error422": { "type": "object", "properties": { "success": { "type": "boolean", "example": false }, "message": { "type": "string", "example": "Validation failed" }, "errors": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } } } },
+      "Error500": { "type": "object", "properties": { "success": { "type": "boolean", "example": false }, "message": { "type": "string" } } }
+    }
+  },
+  "paths": {
+    "/tickets": {
+      "get": {
+        "tags": ["Tickets"],
+        "summary": "List all tickets",
+        "description": "Returns a paginated list of tickets. Each item includes the `user` (id, name, email) and all `messages` (sorted ascending by `created_at`).\n\n**Required permission:** `tickets.index`",
+        "security": [{ "ApplicationApiToken": [] }],
+        "parameters": [
+          { "name": "per_page", "in": "query", "schema": { "type": "integer", "default": 15 } },
+          { "name": "search", "in": "query", "schema": { "type": "string" }, "description": "Searches ticket name, description, or related user name/email" },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["open","closed","resolved","answered","awaiting"] } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated ticket list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "data": {
+                      "allOf": [
+                        { "$ref": "#/components/schemas/PaginationMeta" },
+                        { "type": "object", "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/TicketSummary" } } } }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthenticated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error401" } } } },
+          "403": { "description": "Forbidden",       "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error403" } } } }
+        }
+      },
+      "post": {
+        "tags": ["Tickets"],
+        "summary": "Create a ticket",
+        "description": "Creates a new support ticket. Requirements:\n- Ticket system must be enabled in `ticket_settings` (403 if not).\n- `department` must match one of the configured departments in `ticket_settings.departments` (422 if not).\n\nOn success, an in-app notification is sent to every admin user.\n\n**Required permission:** `tickets.create`",
+        "security": [{ "ApplicationApiToken": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name","description","department","user_id"],
+                "properties": {
+                  "name":               { "type": "string", "maxLength": 255, "example": "Server Down" },
+                  "description":        { "type": "string", "example": "My server has been unreachable since 10am." },
+                  "department":         { "type": "string", "example": "Support" },
+                  "user_id":            { "type": "integer", "example": 42 },
+                  "related_service_id": { "type": "integer", "nullable": true, "example": 7 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Ticket created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean", "example": true },
+                    "message": { "type": "string", "example": "Ticket created successfully" },
+                    "data":    { "$ref": "#/components/schemas/TicketFull" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Unauthenticated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error401" } } } },
+          "403": {
+            "description": "Ticket system disabled or invalid department",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error500" },
+                "examples": {
+                  "system_disabled":    { "value": { "success": false, "message": "Ticket system is currently disabled" } },
+                  "invalid_department": { "value": { "success": false, "message": "Invalid department specified" } }
+                }
+              }
+            }
+          },
+          "422": { "description": "Validation failed", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error422" } } } },
+          "500": { "description": "Internal error",    "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error500" } } } }
+        }
+      }
+    },
+    "/tickets/{id}": {
+      "get": {
+        "tags": ["Tickets"],
+        "summary": "Get a specific ticket",
+        "description": "Returns a single ticket with `user`, `messages.user`, and `service` relationships loaded.\n\n**Required permission:** `tickets.show`",
+        "security": [{ "ApplicationApiToken": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 12 }],
+        "responses": {
+          "200": { "description": "Ticket found", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean", "example": true }, "data": { "$ref": "#/components/schemas/TicketFull" } } } } } },
+          "401": { "description": "Unauthenticated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error401" } } } },
+          "403": { "description": "Forbidden",       "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error403" } } } },
+          "404": { "description": "Ticket not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error404" } } } }
+        }
+      }
+    },
+    "/tickets/{id}/reply": {
+      "post": {
+        "tags": ["Tickets"],
+        "summary": "Reply to a ticket",
+        "description": "Adds a message to the ticket.\n\n**Notification routing:**\n- `is_staff = true` → notification sent to the ticket owner and any `extra_user_ids`\n- `is_staff = false` → notification sent to all admin users\n\n**Required permission:** `tickets.reply`",
+        "security": [{ "ApplicationApiToken": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["message","user_id","is_staff"],
+                "properties": {
+                  "message":     { "type": "string",  "example": "Please check your firewall settings." },
+                  "user_id":     { "type": "integer", "example": 1, "description": "ID of the user sending the reply" },
+                  "is_staff":    { "type": "boolean", "example": true },
+                  "attachments": { "type": "array",   "nullable": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Reply sent", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean", "example": true }, "message": { "type": "string", "example": "Reply sent successfully" }, "data": { "$ref": "#/components/schemas/TicketMessage" } } } } } },
+          "401": { "description": "Unauthenticated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error401" } } } },
+          "403": { "description": "Forbidden",       "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error403" } } } },
+          "404": { "description": "Ticket not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error404" } } } },
+          "422": { "description": "Validation failed", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error422" } } } },
+          "500": { "description": "Internal error",  "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error500" } } } }
+        }
+      }
+    },
+    "/tickets/{id}/close": {
+      "post": {
+        "tags": ["Tickets"],
+        "summary": "Close a ticket",
+        "description": "Sets ticket status to `closed`. Returns 400 if already closed.\nSends a closure notification to the ticket owner and any `extra_user_ids`.\n\n**Required permission:** `tickets.close`",
+        "security": [{ "ApplicationApiToken": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": {
+          "200": { "description": "Ticket closed", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean", "example": true }, "message": { "type": "string", "example": "Ticket closed successfully" }, "data": { "$ref": "#/components/schemas/TicketFull" } } } } } },
+          "400": { "description": "Ticket is already closed", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error500" }, "example": { "success": false, "message": "Ticket is already closed" } } } },
+          "401": { "description": "Unauthenticated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error401" } } } },
+          "403": { "description": "Forbidden",       "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error403" } } } },
+          "404": { "description": "Ticket not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error404" } } } },
+          "500": { "description": "Internal error",  "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error500" } } } }
+        }
+      }
+    },
+    "/tickets/{id}/status": {
+      "put": {
+        "tags": ["Tickets"],
+        "summary": "Update ticket status",
+        "description": "Changes ticket status to any valid value. Returns 400 if already at the requested status.\n\nA status-change notification with a contextual message is sent to the ticket owner and any `extra_user_ids`.\n\n| New status | Message sent | Notification type |\n|---|---|---|\n| `closed` | Your ticket has been closed. | success |\n| `resolved` | Your issue has been resolved. | success |\n| `answered` | Support team has responded. | info |\n| `awaiting` | Your ticket is awaiting your response. | warning |\n| `open` | Your ticket has been reopened. | info |\n\n**Required permission:** `tickets.update`",
+        "security": [{ "ApplicationApiToken": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": { "type": "string", "enum": ["open","closed","resolved","answered","awaiting"], "example": "resolved" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Status updated", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean", "example": true }, "message": { "type": "string", "example": "Ticket status updated successfully" }, "data": { "$ref": "#/components/schemas/TicketFull" } } } } } },
+          "400": { "description": "Already at that status", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error500" }, "example": { "success": false, "message": "Ticket status is already resolved" } } } },
+          "401": { "description": "Unauthenticated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error401" } } } },
+          "403": { "description": "Forbidden",       "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error403" } } } },
+          "404": { "description": "Ticket not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error404" } } } },
+          "422": { "description": "Validation failed", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error422" } } } },
+          "500": { "description": "Internal error",  "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error500" } } } }
+        }
+      }
+    }
+  }
+}

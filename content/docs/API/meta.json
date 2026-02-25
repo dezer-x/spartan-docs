@@ -1,0 +1,9 @@
+{
+    "title": "API Documentation",
+    "description": "Official API Documentation",
+    "icon": "Braces",
+    "pages": [
+        "users", "tickets"
+    ],  
+    "root": true
+}
