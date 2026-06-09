@@ -3,27 +3,21 @@ title: Pterodactyl Setup
 description: Follow this docs to setup Pterodactyl!
 ---
 
-# Pterodactyl Setup
+## Edit Pterodactyl Configuration
 
-Follow this documentation to setup Pterodactyl with DezerX!
-
-## Step 1: Edit Pterodactyl Configuration
-
-1. **Open the Pterodactyl configuration file** by running the following command:
+1. Open the Pterodactyl configuration file by running the following command:
 
 ```bash
 sudo nano /etc/pterodactyl/config.yml
 ```
 
-> **Note:** If you're using a different text editor (e.g., `vi` or `vim`), replace `nano` with your preferred editor.
-
-2. **Scroll down** until you find the following line in the configuration file:
+2. Scroll down until you find the following line in the configuration file:
 
 ```yaml
 allowed_origins: []
 ```
 
-3. **Modify it** to include the allowed origins for your DezerX dashboard:
+3. Modify it to include the allowed origins for your DezerX dashboard:
 
 ```yaml
 allowed_origins:
@@ -31,9 +25,9 @@ allowed_origins:
   - http://dash.example.com
 ```
 
-> **Important:** Replace `https://dash.example.com` and `http://dash.example.com` with your actual dashboard URLs.
+<Callout type="info" > Replace `https://dash.example.com` and `http://dash.example.com` with your actual dashboard URLs.</Callout>
 
-## Step 2: Restart Wings
+## Restart Wings
 
 After saving the configuration changes, you need to **restart the Wings service** to apply them. Run:
 
@@ -41,18 +35,14 @@ After saving the configuration changes, you need to **restart the Wings service*
 sudo systemctl restart wings
 ```
 
-## Step 3: Configure DezerX Admin Panel
-
-1. **Navigate to Admin Panel**: Go to `Admin → Modules → Pterodactyl Service`
-
-![Spartan Configuration Panel](/spartan.png)
+## Configure DezerX Admin Panel
 
 2. **Get Application API Key**:
    - In your Pterodactyl admin panel, navigate to the Application API section
    - Generate a new API key with appropriate permissions
    - Copy the generated key
 
-![Application API Configuration](/application-api.png)
+![Application API Configuration](/services/pterodactyl/step-2.png)
 
 
 3. **Get Client API Key**:
@@ -61,25 +51,18 @@ sudo systemctl restart wings
    - Create a new client API key
    - Copy the generated key
 
-![Client API Configuration](/client-api.png)
+![Client API Configuration](/services/pterodactyl/step-3.png)
 
 4. **Configure in DezerX**:
    - Paste the Application API key in the designated field
    - Paste the Client API key in the designated field
    - Enter your Pterodactyl panel URL
    - Click the "Test Connection" button to verify the setup
+![Spartan Configuration Panel](/services/pterodactyl/step-1.png)
 
 5. **Product Configuration**:
-![Product Configuration](/ptero-product.png)
+![Product Configuration](/services/pterodactyl/step-4.png)
 
-
-## Testing Your Setup
-
-Once you've configured both API keys and the panel URL:
-
-1. Click the **"Test Connection"** button in the DezerX admin panel
-2. If successful, you'll see a confirmation message
-3. If there are any errors, double-check your API keys and panel URL
 
 ## Troubleshooting
 
@@ -90,18 +73,9 @@ If you encounter any issues:
 - Check that the `allowed_origins` configuration includes your DezerX dashboard URL
 - Make sure the Wings service has been restarted after configuration changes
 
-# Port Array Configuration Guide
-
-## Table of Contents
-- [Introduction](#introduction)
-- [Basic Concepts](#basic-concepts)
-- [Syntax & Format](#syntax--format)
-- [Examples](#examples)
-- [Common Use Cases](#common-use-cases)
-- [Troubleshooting](#troubleshooting)
-- [Best Practices](#best-practices)
-
 ---
+
+# Port Array Configuration Guide
 
 ## Introduction
 
@@ -343,89 +317,11 @@ When a requested port is not available, the system uses a **three-tier fallback 
 
 ---
 
-## Common Use Cases
-
-### Use Case 1: IP Segregation for Different Products
-
-**Scenario:** You sell 3 products (Bronze, Silver, Gold) and want to segregate them by IP
-
-**Bronze Product (Budget IPs):**
-```json
-{
-  "SERVER_PORT": "192.168.1.200,192.168.1.201:25565"
-}
-```
-
-**Silver Product (Mid-tier IPs):**
-```json
-{
-  "SERVER_PORT": "192.168.1.100,192.168.1.101:25565"
-}
-```
-
-**Gold Product (Premium IPs):**
-```json
-{
-  "SERVER_PORT": "192.168.1.10,192.168.1.11:25565"
-}
-```
-
----
-
-### Use Case 2: DDoS Protection IP Pools
-
-**Scenario:** You have DDoS-protected IPs and want only specific products to use them
-
-```json
-{
-  "SERVER_PORT": "192.168.1.50,192.168.1.51,192.168.1.52:25565",
-  "QUERY_PORT": "192.168.1.50,192.168.1.51,192.168.1.52:27015"
-}
-```
-
-**Result:** This product will ONLY use your 3 DDoS-protected IPs
-
----
-
-### Use Case 3: Multi-Port Game Servers
-
-**Scenario:** Rust server needing RCON + App port
-
-```json
-{
-  "SERVER_PORT": "192.168.1.100:28015",
-  "RCON_PORT": "192.168.1.100:28016",
-  "APP_PORT": "192.168.1.100:28082"
-}
-```
-
----
-
-### Use Case 4: Reserved Development IPs
-
-**Scenario:** Keep specific IPs for testing/development servers
-
-**Production Products:**
-```json
-{
-  "SERVER_PORT": "192.168.1.100,192.168.1.101,192.168.1.102:25565"
-}
-```
-
-**Development Products:**
-```json
-{
-  "SERVER_PORT": "192.168.1.200,192.168.1.201:25565"
-}
-```
-
----
-
 ## Troubleshooting
 
 ### Understanding Port Fallback Behavior
 
-**Question:** "I requested port 25565 but got 25570 instead - is this a bug?"
+**Question:** "I requested port 25565 but got 25570 instead, is this a bug?"
 
 **Answer:** No, this is expected behavior! The system uses intelligent port fallback:
 
@@ -466,159 +362,3 @@ When a requested port is not available, the system uses a **three-tier fallback 
 - Add more port allocations to the IP
 - Use multiple IP options: `"192.168.1.100,192.168.1.101:25565"`
 
----
-
-### Error: "No allocation found matching IP restrictions"
-
-**Cause:** None of the specified IPs have **any available ports** (not just the exact port)
-
-**Solution:**
-```json
-// Instead of:
-"SERVER_PORT": "192.168.1.100:25565"
-
-// Try adding fallback IPs:
-"SERVER_PORT": "192.168.1.100,192.168.1.101,192.168.1.102:25565"
-```
-
-**Or:** Add more unassigned port allocations to the specified IP(s) in Pterodactyl
-
----
-
-### Server created but using wrong IP
-
-**Cause:** Port specified without IP restriction
-
-**Solution:**
-```json
-// Wrong - any IP:
-"SERVER_PORT": 25565
-
-// Correct - specific IP:
-"SERVER_PORT": "192.168.1.100:25565"
-```
-
----
-
-### Multiple servers sharing the same IP when they shouldn't
-
-**Cause:** No IP restrictions in port_array
-
-**Solution:** Add IP restrictions to each product to segregate them
-
----
-
-## Best Practices
-
-### 1. Always Use IP Restrictions for Production
-
-```json
-// ❌ Bad - random IP assignment
-{
-  "SERVER_PORT": 25565
-}
-
-// ✅ Good - controlled IP assignment
-{
-  "SERVER_PORT": "192.168.1.100,192.168.1.101:25565"
-}
-```
-
----
-
-### 2. Provide Multiple IP Options for Reliability
-
-```json
-// ❌ Risky - only one IP option
-{
-  "SERVER_PORT": "192.168.1.100:25565"
-}
-
-// ✅ Better - fallback options
-{
-  "SERVER_PORT": "192.168.1.100,192.168.1.101,192.168.1.102:25565"
-}
-```
-
----
-
-### 3. Use NONE for Extra Ports
-
-```json
-// ✅ Clean - extra ports in NONE
-{
-  "SERVER_PORT": "192.168.1.100:25565",
-  "QUERY_PORT": "192.168.1.100:27015",
-  "NONE": ["192.168.1.100:7778", "192.168.1.100:7779"]
-}
-```
-
----
-
-### 4. Document Your IP Allocation Strategy
-
-Create a spreadsheet or document:
-
-| IP Range | Purpose | Products Using It |
-|----------|---------|-------------------|
-| 192.168.1.10-19 | Premium/Gold | Gold Minecraft, Gold ARK |
-| 192.168.1.100-109 | Standard | Standard Minecraft, Standard ARK |
-| 192.168.1.200-209 | Budget | Bronze Minecraft |
-
----
-
-### 5. Test Port Arrays Before Going Live
-
-1. Create a test product with your port_array configuration
-2. Try creating a server manually
-3. Check which IP was assigned
-4. Verify environment variables in Pterodactyl
-
----
-
-### 6. Keep Port Arrays Consistent Per Game Type
-
-**Minecraft Products:**
-```json
-{
-  "SERVER_PORT": "IP_LIST:25565",
-  "QUERY_PORT": "IP_LIST:25575"
-}
-```
-
-**ARK Products:**
-```json
-{
-  "SERVER_PORT": "IP_LIST:7777",
-  "QUERY_PORT": "IP_LIST:27015",
-  "RCON_PORT": "IP_LIST:27020"
-}
-```
-
----
-
-## Quick Reference
-
-### Format Cheat Sheet
-
-```json
-{
-  // Single port, any IP
-  "VAR1": 25565,
-
-  // Single port, specific IP
-  "VAR2": "192.168.1.100:25565",
-
-  // Single port, multiple IP options (fallback)
-  "VAR3": "192.168.1.100,192.168.1.101:25565",
-
-  // Multiple ports, any IP
-  "VAR4": [7778, 7779],
-
-  // Multiple ports, specific IP
-  "VAR5": ["192.168.1.100:7778", "192.168.1.100:7779"],
-
-  // Extra ports (no environment variables)
-  "NONE": ["192.168.1.100:8080", "192.168.1.100:8081"]
-}
-```

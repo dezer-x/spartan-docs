@@ -2,7 +2,7 @@
   "title": "Guide Documentation",
   "description": "How to install and setup DezerX",
   "icon": "Aperture",
-  "pages": ["index", "installation", "Updating", "Modules"],
+  "pages": ["index", "installation", "Updating", "Gateways", "Services"],
   "defaultOpen": true,
   "root": true
 }

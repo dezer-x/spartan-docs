@@ -1,11 +1,8 @@
 ---
 title: PayPal
-description: Complete step-by-step guide to set up PayPal payments.
+description: Follow this guide to connect PayPal with Spartan
+
 ---
-
-# PayPal Gateway Setup - Complete Guide
-
-This comprehensive guide will walk you through setting up PayPal payments for your application, including obtaining client credentials and configuring webhooks.
 
 ## Prerequisites
 
@@ -13,45 +10,53 @@ This comprehensive guide will walk you through setting up PayPal payments for yo
 - Access to PayPal Developer Dashboard
 - Your application ready for integration
 
-## Step 1: Access PayPal Developer Dashboard
+## Access PayPal Developer Dashboard
 
-1. **Navigate to PayPal Developer Portal**
+1. Navigate to PayPal Developer Portal
    - Go to [https://developer.paypal.com](https://developer.paypal.com)
    - Click "Log In" and sign in with your PayPal Business account credentials
 
-2. **Dashboard Overview**
+2. Dashboard Overview
    - Once logged in, you'll see the PayPal Developer Dashboard
    - This is your central hub for managing applications and credentials
 
-## Step 2: Create a New Application
+---
 
-1. **Navigate to Applications**
+## Create a New Application
+
+1. Navigate to Applications
    - In the left sidebar, click on "My Apps & Credentials"
    - Click "Create App" button
 
-2. **App Configuration**
+2. App Configuration
    - **App Name**: Enter a descriptive name for your application (e.g., "My Store Payment Gateway")
    - **Type**: Select Merchant ( default )
 
-![Create PayPal Application](/paypal/step-1.png)
+![Create PayPal Application](/gateways/paypal/step-1.png)
 
-## Step 3: Creating Webhook
+---
+
+## Creating Webhook
 
 1. **Webhook Addition**
    - Scroll down at the end and click on Add Webhook button
 
-![Creating Webhook](/paypal/step-3.png)
+![Creating Webhook](/gateways/paypal/step-3.png)
 
-## Step 4: Webhook events
+---
+
+## Webhook events
 
 
 1. **Access Credentials**
    - Select All events
    - scroll down and press create.
 
-![Webhook events](/paypal/step-4.png)
+![Webhook events](/gateways/paypal/step-4.png)
 
-## Step 5: Get Webhook ID
+---
+
+## Get Webhook ID
 
 1. **Webhook Created Successfully**
    - After creating the webhook, you'll see a success message
@@ -62,9 +67,11 @@ This comprehensive guide will walk you through setting up PayPal payments for yo
    - Copy the **Webhook ID** (e.g., `7B89XXXXXX2Y`)
    - This ID is needed for webhook verification in your application
 
-![Webhook ID](/paypal/step-5.png)
+![Webhook ID](/gateways/paypal/step-5.png)
 
-## Step 6: Get Client Credentials
+---
+
+## Get Client Credentials
 
 1. **Navigate to App Credentials**
    - Go back to your app dashboard
@@ -75,16 +82,20 @@ This comprehensive guide will walk you through setting up PayPal payments for yo
    - **Client Secret**: Copy this private key (keep secure, backend only)
    - These credentials are needed for PayPal API authentication
 
-![Get Client Credentials](/paypal/step-2.png)
+![Get Client Credentials](/gateways/paypal/step-2.png)
 
-## Step 7: Adding it to Spartan
+---
+
+## Adding it to Spartan
 
 1. **Now to enable PayPal in Spartan**
    - Login and head over to admin overview
    - Click on Modules inside the sidebar, and head over to gateway tab. and find PayPal module, not PayPalIPN.
    - Over here, do as the image say then press Save Settings.
 
-![Spartan](/paypal/step-6.png)
+![Spartan](/gateways/paypal/step-6.png)
+
+---
 
 ## Troubleshooting
 
@@ -99,5 +110,3 @@ This comprehensive guide will walk you through setting up PayPal payments for yo
    - Verify webhook is enabled and configured correctly
    - Check your server logs for errors
    - Make sure your domain is not flagged. ( Check PayPal for more info )
-
-Your PayPal gateway is now configured and ready for payment processing!

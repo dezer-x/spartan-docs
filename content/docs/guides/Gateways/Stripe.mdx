@@ -1,11 +1,7 @@
 ---
 title: Stripe
-description: Complete step-by-step guide to set up Stripe payments.
+description: Follow this guide to connect Stripe with Spartan
 ---
-
-# Stripe Gateway Setup - Complete Guide
-
-This comprehensive guide will walk you through setting up Stripe payments for your application, including obtaining API keys and configuring webhooks.
 
 ## Prerequisites
 
@@ -13,7 +9,7 @@ This comprehensive guide will walk you through setting up Stripe payments for yo
 - Access to Stripe Dashboard
 - Your application ready for integration
 
-## Step 1: Get API Keys
+## Get API Keys
 
 1. **Navigate to Stripe Dashboard**
    - Go to [https://dashboard.stripe.com](https://dashboard.stripe.com)
@@ -24,9 +20,11 @@ This comprehensive guide will walk you through setting up Stripe payments for yo
    - Click on "API keys" to view your keys
    - Copy both your **Publishable key** and **Secret key**
 
-![Stripe API Keys](/stripe/step-1.png)
+![Stripe API Keys](/gateways/stripe/step-1.png)
 
-## Step 2: Access Webhook Workbench
+---
+
+## Access Webhook Workbench
 
 1. **Navigate to Webhooks**
    - In the left sidebar, click on "Developers"
@@ -36,56 +34,68 @@ This comprehensive guide will walk you through setting up Stripe payments for yo
    - Click "Add destination" to create a new webhook
    - This will open the webhook workbench
 
-![Stripe Webhook Workbench](/stripe/step-2.png)
+![Stripe Webhook Workbench](/gateways/stripe/step-2.png)
 
-## Step 3: Select Events
+---
+
+## Select Events
 
 1. **Choose Events to Listen For**
    - Select "All events" to monitor all Stripe events
    - This ensures comprehensive payment monitoring
    - Click "Continue" to proceed
 
-![Select Events](/stripe/step-3.png)
+![Select Events](/gateways/stripe/step-3.png)
 
-## Step 4: Configure Webhook Endpoint
+---
+
+## Configure Webhook Endpoint
 
 1. **Set Up Endpoint URL**
    - Click on "Webhook endpoint" section
    - This is where you'll configure where to send events
    - Click "Continue" to proceed to the next step
 
-![Webhook Endpoint Configuration](/stripe/step-4.png)
+![Webhook Endpoint Configuration](/gateways/stripe/step-4.png)
 
-## Step 5: Configure Destination
+---
+
+## Configure Destination
 
 1. **Set Destination Name**
    - Enter a descriptive name for your webhook (e.g., "My Store Webhook")
 
 2. **Set Endpoint URL**
-   - **Important**: The endpoint URL must end with `/api/stripe/webhook/callback`
-   - Example: `https://yourdomain.com/api/stripe/webhook/callback`
+   - **Important**: The endpoint URL must end with `/api/gateways/stripe/webhook/callback`
+   - Example: `https://yourdomain.com/api/gateways/stripe/webhook/callback`
    - This exact path is required for proper webhook handling
 
 3. **Complete Setup**
    - Review your configuration
    - Click "Continue" to create the webhook
 
-![Destination Configuration](/stripe/step-5.png)
+![Destination Configuration](/gateways/stripe/step-5.png)
 
-## Step 6: Webhook Created Successfully
+---
+
+## Webhook Created Successfully
 
 1. **Webhook Details**
    - After creating the webhook, you'll see the webhook details
    - Copy the webhook endpoint URL for your application
 
-## Step 7: Adding it to Spartan
+---
+
+## Adding it to Spartan
 
 1. **Now to enable Stripe in Spartan**
    - Login and head over to admin overview
    - Click on Modules inside the sidebar, and head over to gateway tab. and find Stripe module.
    - Over here, do as the image say then press Save Settings.
 
-![Spartan](/stripe/step-6.png)
+![Spartan](/gateways/stripe/step-6.png)
+
+---
 
 ## Troubleshooting
 
@@ -97,7 +107,7 @@ This comprehensive guide will walk you through setting up Stripe payments for yo
 
 2. **Webhook Not Receiving Events**
    - Check webhook URL is accessible
-   - Verify webhook endpoint URL ends with `/api/stripe/webhook/callback`
+   - Verify webhook endpoint URL ends with `/api/gateways/stripe/webhook/callback`
    - Verify webhook is enabled and configured correctly
    - Check your server logs for errors
 
@@ -112,4 +122,3 @@ This comprehensive guide will walk you through setting up Stripe payments for yo
 - [Stripe API Reference](https://stripe.com/docs/api)
 - [Stripe Webhook Documentation](https://stripe.com/docs/webhooks)
 
-Your Stripe gateway is now configured and ready for payment processing!

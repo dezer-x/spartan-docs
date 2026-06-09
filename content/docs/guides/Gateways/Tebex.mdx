@@ -1,11 +1,7 @@
 ---
 title: Tebex
-description: Complete step-by-step guide to set up Tebex payments.
+description: Follow this guide to connect Tebex with Spartan
 ---
-
-# Tebex Gateway Setup - Complete Guide
-
-This comprehensive guide will walk you through setting up Tebex payments for your application, including obtaining API credentials and configuring webhooks.
 
 ## Prerequisites
 
@@ -13,15 +9,18 @@ This comprehensive guide will walk you through setting up Tebex payments for you
 - Access to Tebex Creator Dashboard
 - Your application ready for integration
 
-## Step 1: Access Tebex API Keys
+---
+## Access Tebex API Keys
 
 1. **Navigate to Tebex Creator Dashboard**
    - Go to your Tebex dashboard
    - In the left sidebar, locate and click on **API Keys**
 
-![Access API Keys](/tebex/step-1.png)
+![Access API Keys](/gateways/tebex/step-1.png)
 
-## Step 2: Get Your Credentials
+---
+
+## Get Your Credentials
 
 1. **Copy Required Credentials**
    - **Project ID**: Copy your unique project identifier
@@ -29,19 +28,23 @@ This comprehensive guide will walk you through setting up Tebex payments for you
    - **Private Key**: Copy this secret key (keep secure, backend only)
    - These credentials are needed for Tebex API authentication
 
-![Get Credentials](/tebex/step-2.png)
+![Get Credentials](/gateways/tebex/step-2.png)
 
-## Step 3: Create Webhook
+---
+
+## Create Webhook
 
 1. **Webhook Configuration**
    - Navigate to the webhook section in your Tebex dashboard
    - Create a new webhook endpoint
-   - **Important**: Your webhook URL must end with `/api/webhook/tebex/callback`
-   - Example: `https://yourdomain.com/api/webhook/tebex/callback`
+   - **Important**: Your webhook URL must end with `/api/webhook/gateways/tebex/callback`
+   - Example: `https://yourdomain.com/api/webhook/gateways/tebex/callback`
 
-![Create Webhook](/tebex/step-3.png)
+![Create Webhook](/gateways/tebex/step-3.png)
 
-## Step 4: Adding it to Spartan
+---
+
+## Adding it to Spartan
 
 1. **Enable Tebex in Spartan**
    - Login and head over to admin overview
@@ -54,7 +57,9 @@ This comprehensive guide will walk you through setting up Tebex payments for you
      - **Webhook Secret**: Enter the Webhook Secret from Step 3
    - Press **Save Settings**
 
-![Spartan Configuration](/tebex/step-4.png)
+![Spartan Configuration](/gateways/tebex/step-4.png)
+
+---
 
 ## Troubleshooting
 
@@ -65,12 +70,10 @@ This comprehensive guide will walk you through setting up Tebex payments for you
    - Ensure there are no extra spaces when copying credentials
 
 2. **Webhook Not Receiving Events**
-   - Check webhook URL ends with `/api/webhook/tebex/callback`
+   - Check webhook URL ends with `/api/webhook/gateways/tebex/callback`
    - Verify webhook URL is accessible publicly
    - Check your server logs for errors
    - Make sure your webhook is validated inside Tebex
 
 3. **Payment Processing Failures**
    - Check Webhook.
-
-Your Tebex gateway is now configured and ready for payment processing!

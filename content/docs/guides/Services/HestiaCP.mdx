@@ -1,0 +1,39 @@
+---
+title: HestiaCP
+description: Follow this guide to connect HestiaCP with Spartan
+---
+
+## Configure HestiaCP API Access
+
+1. **Log into your HestiaCP admin panel** using your administrator credentials
+
+2. **Navigate to Server Settings**:
+   - Go to `Server` → `Settings` in the HestiaCP admin panel
+   - Look for the API settings section
+
+3. **Enable API Access**:
+   - Enable the API functionality if it's not already enabled
+   - Note down the HestiaCP URL (usually `https://your-hestia-domain.com
+
+---
+
+## Whitelist Spartan IP Address
+
+To allow DezerX to connect to your HestiaCP instance, you need to whitelist the DezerX Spartan's server's IP address:
+
+1. **Find your DezerX Spartan's server's IP address**:
+   - Check your server's public IP address
+   - This is the IP address that DezerX will use to make API calls to HestiaCP
+
+2. **Add IP to HestiaCP whitelist**:
+   - In HestiaCP admin panel, go to `Server` → `Configuration` 
+   - Add your DezerX server's IP address to the allowed list
+   - Ensure the IP is whitelisted for API access
+
+---
+
+## Configure HestiaCP Module.
+
+1. **Navigate to Admin Panel**: Go to `Admin → Modules → HestiaCP `
+
+![HestiaCP Configuration Panel](/services/hestiacp/step-1.png)
